@@ -30,9 +30,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.1.0
-  geolocator: ^14.0.2     # قمنا برفع الإصدار ليتوافق مع القبلة
-  flutter_qiblah: ^3.2.0  # هذا الإصدار الذي يحل مشكلة الـ Namespace
+  geolocator: ^14.0.2
+  flutter_qiblah: ^3.2.0
+  # تأكد من إضافة هذه المكتبات لدعم الربط مع Firebase لاحقاً
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  cloud_firestore: ^6.3.0
+  mailer: ^7.1.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

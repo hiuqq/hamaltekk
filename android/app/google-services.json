@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1070545470779",
+    "project_id": "ihcs-1ff9c",
+    "storage_bucket": "ihcs-1ff9c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1070545470779:android:93634792a1478079c7e31e",
+        "android_client_info": {
+          "package_name": "com.example.hamaltekk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBK7Gdl5O1juAu7paONjSXaf1P-1hri6Ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
