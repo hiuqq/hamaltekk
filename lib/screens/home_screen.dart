@@ -6,15 +6,15 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_qiblah/flutter_qiblah.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // =============================================================
-// الجزء 1: دوال جلب البيانات (هنا سيتم الربط مع الـ API الخاص بكِ)
+// الجزء 1: دوال جلب البيانات
 // =============================================================
 
-// 🟢 دالة حساب المسافة: ستحتاجين مستقبلاً لجلب إحداثيات (الجمرات) من قاعدة البيانات بدل كتابتها يدوياً
 Future<String> calculateDistanceToJamarat() async {
   try {
-    // 🚩 BACK-END NOTE: هذه الإحداثيات ثابتة الآن، مستقبلاً قد تأتي من API حسب موقع المخيم
     const double jamaratLat = 21.4214;
     const double jamaratLon = 39.8727;
 
@@ -32,11 +32,10 @@ Future<String> calculateDistanceToJamarat() async {
     double distanceInKm = distanceInMeters / 1000;
     return "${distanceInKm.toStringAsFixed(1)} km";
   } catch (e) {
-    return "2.1 km"; // قيمة احتياطية في حال فشل الحساب
+    return "2.1 km";
   }
 }
 
-// 🟢 دالة الطقس: تستخدم حالياً API خارجي
 Future<Map<String, dynamic>> fetchWeather() async {
   const apiKey = '52a3c3c645f78d3902d69531818d958a';
   const lat = '21.4172';
@@ -53,7 +52,6 @@ Future<Map<String, dynamic>> fetchWeather() async {
   }
 }
 
-// 🟢 دالة مواقيت الصلاة
 Future<Map<String, dynamic>> fetchPrayerTimes() async {
   const lat = '21.4225';
   const lon = '39.8262';
@@ -70,13 +68,135 @@ Future<Map<String, dynamic>> fetchPrayerTimes() async {
 }
 
 // =============================================================
-// الجزء 2: واجهة المستخدم الرئيسية (HomeScreen)
+// الجزء 2: منطق التسكين الشامل للثلاث مشاعر
 // =============================================================
 
-class HomeScreen extends StatelessWidget {
+class HousingService {
+  static Future<void> autoAssignHousing() async {
+    final String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    final firestore = FirebaseFirestore.instance;
+
+    var userDoc = await firestore.collection('Users').doc(userId).get();
+    if (userDoc.exists && userDoc.data()!.containsKey('housing_mina')) return;
+
+    try {
+      List<String> camps = ['mina', 'arafat', 'muzdalifa'];
+      Map<String, dynamic> userHousingData = {};
+
+      for (String campId in camps) {
+        var halls = await firestore
+            .collection('camps')
+            .doc(campId)
+            .collection('halls')
+            .get();
+        bool assignedForThisCamp = false;
+
+        for (var hall in halls.docs) {
+          if (assignedForThisCamp) break;
+          var rooms = await hall.reference.collection('rooms').get();
+
+          for (var room in rooms.docs) {
+            if (assignedForThisCamp) break;
+            var beds = await room.reference
+                .collection('beds')
+                .where('is_available', isEqualTo: true)
+                .limit(1)
+                .get();
+
+            if (beds.docs.isNotEmpty) {
+              var selectedBed = beds.docs.first;
+
+              await selectedBed.reference.update({
+                'is_available': false,
+                'user_id': userId,
+              });
+
+              String masherName = campId == 'mina'
+                  ? 'منى'
+                  : (campId == 'arafat' ? 'عرفة' : 'مزدلفة');
+
+              userHousingData['housing_$campId'] = {
+                'masher': masherName,
+                'hall': hall.id,
+                'room': room.id,
+                'bed': selectedBed.id,
+                'group_id': selectedBed.data()['group_id'],
+              };
+
+              assignedForThisCamp = true;
+            }
+          }
+        }
+      }
+
+      if (userHousingData.isNotEmpty) {
+        await firestore
+            .collection('Users')
+            .doc(userId)
+            .set(userHousingData, SetOptions(merge: true));
+      }
+    } catch (e) {
+      print("Housing Error: $e");
+    }
+  }
+}
+
+// =============================================================
+// الجزء 3: الشاشة الرئيسية
+// =============================================================
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
-  // 🖼️ دالة إظهار الخريطة المنبثقة (Pop-up)
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    HousingService.autoAssignHousing();
+  }
+
+  // دالة البحث عن المشرف بناءً على الـ group_id
+  Future<String> fetchSupervisorFromDB(String? groupId) async {
+    if (groupId == null) return "غير معين";
+    try {
+      // 1. القفزة الأولى: الحصول على sup_id من الجروب (مثلاً: "901")
+      var groupDoc = await FirebaseFirestore.instance
+          .collection('Groups')
+          .doc(groupId)
+          .get();
+
+      String? supIdInGroup = groupDoc.data()?['sup_id'];
+      if (supIdInGroup == null) return "لم يتم تحديد رقم مشرف";
+
+      // 2. القفزة الثانية: البحث في كولكشن Staff عن الوثيقة التي فيها j_no مطابق لـ supIdInGroup
+      var staffQuery = await FirebaseFirestore.instance
+          .collection('Staff')
+          .where('j_no', isEqualTo: supIdInGroup)
+          .limit(1)
+          .get();
+
+      if (staffQuery.docs.isNotEmpty) {
+        // نأخذ الاسم من أول وثيقة مطابقة نجدها
+        return staffQuery.docs.first.data()['name'] ?? "مشرف بدون اسم";
+      } else {
+        return "المشرف $supIdInGroup غير موجود";
+      }
+    } catch (e) {
+      return "خطأ في الاتصال";
+    }
+  }
+
+  // دالة تنظيف المسميات
+  String formatLabel(String rawId, String prefix, String replaceWith) {
+    return rawId.replaceAll(prefix, replaceWith).replaceAll('_', ' ');
+  }
+
   void _showMapDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -125,91 +245,191 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String? userId = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
-      backgroundColor: Colors.black, // الثيم الغامق للبرنامج
+      backgroundColor: Colors.black,
       extendBody: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/black.png'), // خلفية الشاشة الكاملة
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.end, // محاذاة العناصر لليمين (عربي)
-              children: [
-                const SizedBox(height: 20),
-                // 🚩 BACK-END NOTE: هنا يتم استبدال "أحمد" و "صالح" بمتغيرات تأتي من بيانات تسجيل دخول المستخدم
-                const Text(
-                  'أهلاً أحمد 👋',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Text(
-                  'اسم المشرف المسؤول: صالح ياسر الشهري',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('Users')
+            .doc(userId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFFA07B4F)),
+            );
+          }
 
-                const SizedBox(height: 30),
-                _buildQRCodeSection(), // استدعاء قسم الـ QR
+          var userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
 
-                const SizedBox(height: 30),
-                _buildSectionTitle('معلومات التسكين'),
-                const SizedBox(height: 15),
+          // القراءة من المسارات الصحيحة الجديدة
+          String userName = userData['info']?['name'] ?? 'الحاج';
+          String nusukId = userData['ref_no'] ?? '123456';
+          String? groupId = userData['group_id'];
+          // 🌟 صناعة رابط فريد خاص بهذا الحاج بناءً على رقم النسك حقه
+          String uniqueQrLink = "https://hamlatuk.com/pilgrim/$nusukId";
 
-                // قائمة كروت التسكين (Scroll أفقي)
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  child: Row(
-                    children: [
-                      // 🚩 BACK-END NOTE: هذه الكروت يجب أن تُبنى باستخدام ListView.builder بناءً على مصفوفة بيانات الحاج
-                      _buildInfoCard(context, 'مزدلفة', '15', 'أ-4'),
-                      _buildInfoCard(context, 'عرفة', '20', '16'),
-                      _buildInfoCard(context, 'منى', '913', '13'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-                _buildSectionTitle('خدمات إضافية'),
-                const SizedBox(height: 15),
-                _buildServicesGrid(
-                  context,
-                ), // شبكة الخدمات (صلاة، طقس، مسافة، قبلة)
-                const SizedBox(height: 120),
-              ],
+          return Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/black.png'),
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-        ),
+            child: SafeArea(
+              bottom: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const SizedBox(height: 20),
+                    Text(
+                      'أهلاً $userName 👋',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    // جلب اسم المشرف
+                    FutureBuilder<String>(
+                      future: fetchSupervisorFromDB(groupId),
+                      builder: (context, supSnapshot) {
+                        String supName = supSnapshot.data ?? "جاري التحميل...";
+                        return Text(
+                          'اسم المشرف المسؤول: $supName',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 30),
+                    _buildQRCodeSection(uniqueQrLink),
+
+                    const SizedBox(height: 30),
+                    _buildSectionTitle('معلومات التسكين'),
+                    const SizedBox(height: 15),
+
+                    // --- كروت التسكين ---
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      child: Row(
+                        children: [
+                          // 1. كارد مزدلفة
+                          if (userData.containsKey('housing_muzdalifa'))
+                            _buildInfoCard(
+                              context,
+                              userData['housing_muzdalifa']['masher'] ??
+                                  'مزدلفة',
+                              formatLabel(
+                                userData['housing_muzdalifa']['hall'] ?? '',
+                                'hall_',
+                                'صالة ',
+                              ),
+                              formatLabel(
+                                userData['housing_muzdalifa']['room'] ?? '',
+                                'room_',
+                                'غرفة ',
+                              ),
+                              formatLabel(
+                                userData['housing_muzdalifa']['bed'] ?? '',
+                                'bed_',
+                                'موقع ',
+                              ),
+                            )
+                          else
+                            _buildEmptyCard('مزدلفة'),
+
+                          // 2. كارد عرفة
+                          if (userData.containsKey('housing_arafat'))
+                            _buildInfoCard(
+                              context,
+                              userData['housing_arafat']['masher'] ?? 'عرفة',
+                              formatLabel(
+                                userData['housing_arafat']['hall'] ?? '',
+                                'hall_',
+                                'صالة ',
+                              ),
+                              formatLabel(
+                                userData['housing_arafat']['room'] ?? '',
+                                'room_',
+                                'غرفة ',
+                              ),
+                              formatLabel(
+                                userData['housing_arafat']['bed'] ?? '',
+                                'bed_',
+                                'موقع ',
+                              ),
+                            )
+                          else
+                            _buildEmptyCard('عرفة'),
+
+                          // 3. كارد منى
+                          if (userData.containsKey('housing_mina'))
+                            _buildInfoCard(
+                              context,
+                              userData['housing_mina']['masher'] ?? 'منى',
+                              formatLabel(
+                                userData['housing_mina']['hall'] ?? '',
+                                'hall_',
+                                'صالة ',
+                              ),
+                              formatLabel(
+                                userData['housing_mina']['room'] ?? '',
+                                'room_',
+                                'غرفة ',
+                              ),
+                              formatLabel(
+                                userData['housing_mina']['bed'] ?? '',
+                                'bed_',
+                                'موقع ',
+                              ),
+                            )
+                          else
+                            _buildEmptyCard('منى'),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+                    _buildSectionTitle('خدمات إضافية'),
+                    const SizedBox(height: 15),
+                    _buildServicesGrid(context),
+                    const SizedBox(height: 120),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomBar(),
     );
   }
 
-  // 🛠️ بناء كارد معلومات التسكين
+  // --- Widgets ---
+
   Widget _buildInfoCard(
     BuildContext context,
     String masher,
     String hall,
+    String room,
     String location,
   ) {
     return Container(
       width: 160,
-      height: 160,
+      height: 180,
       margin: const EdgeInsets.only(left: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         image: const DecorationImage(
-          image: AssetImage('assets/card.png'), // خلفية الكارد
+          image: AssetImage('assets/card.png'),
           fit: BoxFit.cover,
           opacity: 0.8,
         ),
@@ -228,7 +448,9 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 4),
             _buildTextRow('الصالة:', hall),
             const SizedBox(height: 4),
-            _buildTextRow('الموقع:', location),
+            _buildTextRow('الغرفة:', room),
+            const SizedBox(height: 4),
+            _buildTextRow('السرير:', location),
             const Spacer(),
             GestureDetector(
               onTap: () => _showMapDialog(context),
@@ -254,7 +476,32 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // 🛠️ بناء شبكة الخدمات الإضافية
+  Widget _buildEmptyCard(String title) {
+    return Container(
+      width: 160,
+      height: 180,
+      margin: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.bed, color: Colors.white24, size: 30),
+            const SizedBox(height: 8),
+            Text(
+              'جاري تخصيص $title',
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildServicesGrid(BuildContext context) {
     return GridView.count(
       shrinkWrap: true,
@@ -264,7 +511,6 @@ class HomeScreen extends StatelessWidget {
       mainAxisSpacing: 15,
       childAspectRatio: 1.0,
       children: [
-        // كارد الصلاة (بيانات حية)
         FutureBuilder<Map<String, dynamic>>(
           future: fetchPrayerTimes(),
           builder: (context, snapshot) {
@@ -275,11 +521,10 @@ class HomeScreen extends StatelessWidget {
                   : '--:--',
               'وقت صلاة الظهر',
               Icons.access_time,
-              'assets/card.png',
+              'assets/salah.png',
             );
           },
         ),
-        // كارد الطقس (بيانات حية)
         FutureBuilder<Map<String, dynamic>>(
           future: fetchWeather(),
           builder: (context, snapshot) {
@@ -290,11 +535,10 @@ class HomeScreen extends StatelessWidget {
                   : '--',
               'حالة الطقس',
               Icons.wb_sunny_outlined,
-              'assets/card.png',
+              'assets/weather.png',
             );
           },
         ),
-        // كارد المسافة (بيانات حية من الـ GPS)
         FutureBuilder<String>(
           future: calculateDistanceToJamarat(),
           builder: (context, snapshot) {
@@ -303,11 +547,10 @@ class HomeScreen extends StatelessWidget {
               snapshot.hasData ? snapshot.data! : '...',
               'إلى الجمرات',
               Icons.straighten,
-              'assets/card.png',
+              'assets/jamrat.png',
             );
           },
         ),
-        // كارد القبلة (انتقال لشاشة أخرى)
         GestureDetector(
           onTap: () => Navigator.push(
             context,
@@ -318,14 +561,13 @@ class HomeScreen extends StatelessWidget {
             'مكة',
             'حدد اتجاهك الآن',
             Icons.explore_outlined,
-            'assets/card.png',
+            'assets/qibla.png',
           ),
         ),
       ],
     );
   }
 
-  // 🛠️ بناء عنصر الخدمة المنفرد
   Widget _serviceItem(
     String title,
     String val,
@@ -381,7 +623,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // 🛠️ بناء صف نصي (Label: Value)
   Widget _buildTextRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -403,7 +644,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // 🛠️ عنوان الأقسام
   Widget _buildSectionTitle(String title) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -422,8 +662,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // 🛠️ قسم الـ QR Code
-  Widget _buildQRCodeSection() {
+  Widget _buildQRCodeSection(String qrData) {
+    // 🌟 تشفير الرابط عشان الـ API حق الصور يقبله بدون مشاكل
+    String encodedData = Uri.encodeComponent(qrData);
+
     return Center(
       child: Column(
         children: [
@@ -438,9 +680,8 @@ class HomeScreen extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
-            // 🚩 BACK-END NOTE: هنا يجب تمرير معرف الحاج الفريد (User ID) في رابط الـ QR
             child: Image.network(
-              'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=User123',
+              'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=$encodedData',
               width: 200,
               height: 200,
             ),
@@ -450,7 +691,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // 🛠️ البار السفلي (Navigation Bar)
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
@@ -482,10 +722,9 @@ class HomeScreen extends StatelessWidget {
 }
 
 // =============================================================
-// الجزء 3: شاشة القبلة (QiblaScreen)
+// الجزء 4: شاشة القبلة (QiblaScreen)
 // =============================================================
 
-// (ملاحظة: شاشة القبلة تعتمد كلياً على حساسات الجهاز والـ GPS ولا تحتاج باك اند غالباً)
 class QiblaScreen extends StatefulWidget {
   const QiblaScreen({super.key});
   @override
@@ -499,10 +738,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPermission(); // طلب الإذن عند فتح الشاشة
+    _checkPermission();
   }
 
-  // دالة التأكد من صلاحيات الموقع
   Future<void> _checkPermission() async {
     final status = await FlutterQiblah.checkLocationStatus();
     if (status.status == LocationPermission.always ||
@@ -540,16 +778,13 @@ class _QiblaScreenState extends State<QiblaScreen> {
           : StreamBuilder(
               stream: FlutterQiblah.qiblahStream,
               builder: (context, AsyncSnapshot<QiblahDirection> snapshot) {
-                if (!snapshot.hasData) {
+                if (!snapshot.hasData)
                   return const Center(
                     child: CircularProgressIndicator(color: Color(0xFFA07B4F)),
                   );
-                }
-
                 final qiblahDirection = snapshot.data!;
                 final bool isAligned = qiblahDirection.offset.abs() < 5;
 
-                // تفعيل الاهتزاز عند الوصول للقبلة الصحيحة
                 if (isAligned && !isHapticFeedbackDone) {
                   HapticFeedback.heavyImpact();
                   isHapticFeedbackDone = true;
@@ -628,7 +863,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
   }
 }
 
-// رسام البوصلة (الدوائر والخطوط)
 class CompassPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -643,7 +877,7 @@ class CompassPainter extends CustomPainter {
         paint,
       );
       canvas.translate(center.dx, center.dy);
-      canvas.rotate(0.785); // 45 درجة
+      canvas.rotate(0.785);
       canvas.translate(-center.dx, -center.dy);
     }
   }

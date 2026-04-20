@@ -30,23 +30,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
+      // 1. التحقق من كولكشن الحجاج (Nusk)
       var nuskDoc = await FirebaseFirestore.instance
           .collection('Nusk')
           .doc(refNo)
           .get();
+
       String userType = '';
       Map<String, dynamic> infoData = {};
 
       if (nuskDoc.exists) {
-        userType = 'p';
+        userType = 'p'; // الحاج (Pilgrim)
         infoData = nuskDoc.data()!;
       } else {
+        // 2. إذا لم يكن حاجاً، نتحقق من كولكشن المشرفين (Staff)
         var staffDoc = await FirebaseFirestore.instance
             .collection('Staff')
             .doc(refNo)
             .get();
+
         if (staffDoc.exists) {
-          userType = 's';
+          userType = 's'; // المشرف (Staff)
           infoData = staffDoc.data()!;
         } else {
           _showSnackBar('رقم التصريح أو الرقم الوظيفي غير موجود');
@@ -55,9 +59,39 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
 
+      // 3. إنشاء الحساب في Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
+      // =========================================================
+      // 🌟 خوارزمية التعيين التلقائي للجروبات (للحجاج فقط) 🌟
+      // =========================================================
+      String? assignedGroupId;
+
+      if (userType == 'p') {
+        var groupsSnapshot = await FirebaseFirestore.instance
+            .collection('Groups')
+            .get();
+
+        for (var doc in groupsSnapshot.docs) {
+          var data = doc.data();
+          int current = data['current_count'] ?? 0;
+          int max = data['max_capacity'] ?? 0;
+
+          if (current < max) {
+            assignedGroupId = doc.id; // تم إيجاد مقعد شاغر
+
+            // زيادة العداد فوراً لمنع التضارب
+            await doc.reference.update({
+              'current_count': FieldValue.increment(1),
+            });
+            break; // إيقاف البحث بعد إيجاد الجروب
+          }
+        }
+      }
+      // =========================================================
+
+      // 4. تجهيز بيانات المستخدم للحفظ
       UserModel newUser = UserModel(
         email: email,
         type: userType,
@@ -66,11 +100,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
         createdAt: Timestamp.now(),
       );
 
+      // دمج بيانات المستخدم مع الجروب (إذا كان حاجاً)
+      Map<String, dynamic> finalUserData = newUser.toMap();
+      if (assignedGroupId != null) {
+        finalUserData['group_id'] = assignedGroupId;
+      }
+
+      // 5. حفظ البيانات النهائية في كولكشن (Users)
       await FirebaseFirestore.instance
           .collection('Users')
           .doc(userCredential.user!.uid)
-          .set(newUser.toMap());
+          .set(finalUserData);
 
+      // 6. الانتقال للشاشة الرئيسية
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -108,12 +150,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 1. الخلفية المزخرفة
           Positioned.fill(
             child: Image.asset('assets/black.png', fit: BoxFit.cover),
           ),
-
-          // 2. حاوية الكعبة في الأسفل (نفس اللوجين)
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -154,8 +193,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
           ),
-
-          // 3. العنوان
           Positioned(
             bottom: kaabaHeight + 19,
             right: 22,
@@ -169,8 +206,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
           ),
-
-          // 4. المحتوى (الحقول)
           SafeArea(
             child: Column(
               children: [
@@ -198,13 +233,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           true,
                         ),
                         const SizedBox(height: 30),
-
                         isLoading
                             ? const CircularProgressIndicator(
                                 color: Color(0xFFA07B4F),
                               )
                             : _buildGradientButton('تسجيل', _handleSignUp),
-
                         const SizedBox(height: 15),
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
