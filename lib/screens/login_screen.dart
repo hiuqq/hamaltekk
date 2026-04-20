@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // استيراد الفايربيس
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🌟 أضفنا استيراد الفايرستور عشان نقرأ نوع المستخدم
 import 'create_screen.dart';
-import 'home_screen.dart'; // استيراد صفحة الهوم للانتقال إليها بعد النجاح
+import 'home_screen.dart';
+import 'staff_home_screen.dart'; // 🌟 أضفنا استيراد شاشة المشرف
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,9 +16,9 @@ class _LoginScreenState extends State<LoginScreen> {
   // 1. تعريف المتحكمات لسحب النصوص من الحقول
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false; // لإظهار مؤشر تحميل عند الضغط على الزر
+  bool _isLoading = false;
 
-  // 2. دالة تسجيل الدخول عبر الفايربيس
+  // 2. دالة تسجيل الدخول عبر الفايربيس مع التوجيه الذكي
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(
@@ -28,17 +30,41 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      // تسجيل الدخول
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
-      // إذا نجح تسجيل الدخول، ننتقل للشاشة الرئيسية
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+      // 🌟 التوجيه الذكي: جلب بيانات المستخدم لمعرفة نوعه (مشرف أم حاج)
+      String uid = userCredential.user!.uid;
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(uid)
+          .get();
+
+      if (userDoc.exists) {
+        String userType =
+            userDoc.get('type') ?? 'p'; // نفترض أنه حاج إذا لم نجد الحقل
+
+        if (mounted) {
+          if (userType == 's') {
+            // توجيه المشرف
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const StaffHomeScreen()),
+            );
+          } else {
+            // توجيه الحاج
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          }
+        }
+      } else {
+        throw Exception('بيانات المستخدم غير موجودة في قاعدة البيانات');
       }
     } on FirebaseAuthException catch (e) {
       String message = 'حدث خطأ ما';
@@ -51,6 +77,12 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -140,7 +172,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Column(
                       children: [
-                        // تمرير المتحكم للحقل
                         _buildTextField(
                           'أدخل بريدك الإلكتروني',
                           false,
@@ -154,7 +185,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 40),
 
-                        // زر تسجيل الدخول مع حالة التحميل
                         _isLoading
                             ? const CircularProgressIndicator(
                                 color: Color(0xFFA07B4F),
@@ -189,7 +219,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // تعديل الدالة لتستقبل الـ Controller
   Widget _buildTextField(
     String hint,
     bool isPassword,

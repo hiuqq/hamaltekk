@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hamaltekk/models/user_model.dart';
 import 'package:hamaltekk/screens/home_screen.dart';
+import 'package:hamaltekk/screens/staff_home_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -30,6 +31,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
+      print("🚀 بدء فحص الرقم: $refNo");
+
       // 1. التحقق من كولكشن الحجاج (Nusk)
       var nuskDoc = await FirebaseFirestore.instance
           .collection('Nusk')
@@ -38,20 +41,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       String userType = '';
       Map<String, dynamic> infoData = {};
+      Map<String, dynamic> activeHajjTasks = {}; // لتخزين المهام النشطة
 
       if (nuskDoc.exists) {
-        userType = 'p'; // الحاج (Pilgrim)
+        userType = 'p'; // حاج
         infoData = nuskDoc.data()!;
+        print("✅ تم العثور على حاج");
       } else {
-        // 2. إذا لم يكن حاجاً، نتحقق من كولكشن المشرفين (Staff)
+        // 2. التحقق من كولكشن المشرفين (Staff)
         var staffDoc = await FirebaseFirestore.instance
             .collection('Staff')
             .doc(refNo)
             .get();
 
         if (staffDoc.exists) {
-          userType = 's'; // المشرف (Staff)
+          userType = 's'; // مشرف
           infoData = staffDoc.data()!;
+          print("✅ تم العثور على مشرف");
+
+          // 🌟 سحب قوالب المهام وتحويلها لمهام نشطة (is_completed: false)
+          var templates = staffDoc.data()?['task_templates'];
+          if (templates != null && templates is Map) {
+            templates.forEach((dayKey, taskList) {
+              if (taskList is List) {
+                activeHajjTasks[dayKey] = taskList
+                    .map(
+                      (title) => {
+                        'title': title.toString(),
+                        'is_completed': false,
+                      },
+                    )
+                    .toList();
+              }
+            });
+            print("📋 تم تجهيز ${activeHajjTasks.length} أيام من المهام");
+          } else {
+            print("⚠️ تنبيه: حقل task_templates غير موجود في ملف المشرف");
+          }
         } else {
           _showSnackBar('رقم التصريح أو الرقم الوظيفي غير موجود');
           setState(() => isLoading = false);
@@ -63,60 +89,52 @@ class _SignUpScreenState extends State<SignUpScreen> {
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // =========================================================
-      // 🌟 خوارزمية التعيين التلقائي للجروبات (للحجاج فقط) 🌟
-      // =========================================================
+      // 4. خوارزمية التعيين التلقائي للجروبات (للحجاج فقط)
       String? assignedGroupId;
-
       if (userType == 'p') {
         var groupsSnapshot = await FirebaseFirestore.instance
             .collection('Groups')
             .get();
-
         for (var doc in groupsSnapshot.docs) {
           var data = doc.data();
-          int current = data['current_count'] ?? 0;
-          int max = data['max_capacity'] ?? 0;
-
-          if (current < max) {
-            assignedGroupId = doc.id; // تم إيجاد مقعد شاغر
-
-            // زيادة العداد فوراً لمنع التضارب
+          if ((data['current_count'] ?? 0) < (data['max_capacity'] ?? 0)) {
+            assignedGroupId = doc.id;
             await doc.reference.update({
               'current_count': FieldValue.increment(1),
             });
-            break; // إيقاف البحث بعد إيجاد الجروب
+            break;
           }
         }
       }
-      // =========================================================
-
-      // 4. تجهيز بيانات المستخدم للحفظ
-      UserModel newUser = UserModel(
-        email: email,
-        type: userType,
-        refNo: refNo,
-        info: infoData,
-        createdAt: Timestamp.now(),
-      );
-
-      // دمج بيانات المستخدم مع الجروب (إذا كان حاجاً)
-      Map<String, dynamic> finalUserData = newUser.toMap();
-      if (assignedGroupId != null) {
-        finalUserData['group_id'] = assignedGroupId;
-      }
 
       // 5. حفظ البيانات النهائية في كولكشن (Users)
+      // ندمج المهام النشطة داخل حقل info للمشرف
+      if (userType == 's') {
+        infoData['active_hajj_tasks'] = activeHajjTasks;
+      }
+
       await FirebaseFirestore.instance
           .collection('Users')
           .doc(userCredential.user!.uid)
-          .set(finalUserData);
+          .set({
+            'email': email,
+            'type': userType,
+            'refNo': refNo,
+            'info': infoData,
+            'group_id': assignedGroupId,
+            'createdAt': Timestamp.now(),
+          });
 
-      // 6. الانتقال للشاشة الرئيسية
+      print("✨ تم حفظ بيانات المستخدم بنجاح في كولكشن Users");
+
+      // 6. التوجيه الذكي
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (context) =>
+                userType == 's' ? const StaffHomeScreen() : const HomeScreen(),
+          ),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -126,6 +144,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             : 'حدث خطأ في التسجيل',
       );
     } catch (e) {
+      print("🚨 خطأ غير متوقع: $e");
       _showSnackBar('خطأ غير متوقع: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
