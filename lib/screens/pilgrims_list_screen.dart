@@ -150,14 +150,21 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                           itemBuilder: (context, index) {
                             var pilgrimData =
                                 docs[index].data() as Map<String, dynamic>;
-
-                            // 🌟 سحب الاسم من المسار الصحيح info -> name
                             String name =
                                 pilgrimData['info']?['name'] ?? 'حاج بدون اسم';
 
-                            // فحص وجود أمراض للحصول على اللون الأحمر (استخدام فيلد dis)
-                            List diseases = pilgrimData['info']?['dis'] ?? [];
-                            bool isCritical = diseases.isNotEmpty;
+                            // 🌟 التعديل: سحب الأمراض وتصفيتها من أي نصوص فارغة أو مسافات
+                            List rawDiseases =
+                                pilgrimData['info']?['dis'] ?? [];
+                            List cleanDiseases = rawDiseases
+                                .where(
+                                  (element) =>
+                                      element.toString().trim().isNotEmpty,
+                                )
+                                .toList();
+
+                            // إذا بعد التنظيف صارت المصفوفة فيها أمراض حقيقية، خله أحمر
+                            bool isCritical = cleanDiseases.isNotEmpty;
 
                             return _buildPilgrimCard(
                               context,

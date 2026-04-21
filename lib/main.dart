@@ -57,7 +57,7 @@ class MyApp extends StatelessWidget {
       ),
 
       // 🏁 أول شاشة تظهر عند تشغيل التطبيق (اللوقو)
-      home: const SignUpScreen(),
+      home: const LogoScreen(),
 
       // تعريف المسارات (Routes) للتنقل بين الشاشات
       routes: {

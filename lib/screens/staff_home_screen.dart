@@ -11,10 +11,8 @@ class StaffHomeScreen extends StatefulWidget {
 }
 
 class _StaffHomeScreenState extends State<StaffHomeScreen> {
-  // 🌟 متغير لحفظ اليوم المحدد حالياً (الافتراضي هو يوم التروية - 8)
   String selectedDayKey = 'day_8';
 
-  // قائمة بأسماء الأيام والمفاتيح الخاصة بها في الداتابيس
   final List<Map<String, String>> hajjDays = [
     {'key': 'day_8', 'name': 'يوم 8\nالتروية'},
     {'key': 'day_9', 'name': 'يوم 9\nعرفة'},
@@ -30,21 +28,8 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      extendBody: true, // مهم للبار السفلي
-      // 🌟 زر الكاميرا العائم في المنتصف (الماسح)
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          print("فتح كاميرا المسح...");
-        },
-        backgroundColor: const Color(0xFFA07B4F),
-        shape: const CircleBorder(),
-        child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
-      // 🌟 البار السفلي
-      bottomNavigationBar: _buildBottomBar(),
-
+      // شلنا البار السفلي من هنا لأنه صار في الشاشة الأم
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('Users')
@@ -58,15 +43,11 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
           }
 
           var userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
-
-          // سحب الاسم
           String fullName = userData['info']?['name'] ?? 'مشرفنا';
           String firstName = fullName.split(' ')[0];
 
-          // سحب مهام الحج من الداتابيس
           Map<String, dynamic> activeHajjTasks =
               userData['info']?['active_hajj_tasks'] ?? {};
-          // مهام اليوم المحدد فقط
           List<dynamic> currentDayTasks = activeHajjTasks[selectedDayKey] ?? [];
 
           return Container(
@@ -84,8 +65,6 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     const SizedBox(height: 30),
-
-                    // 1. الترحيب
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -103,58 +82,58 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                     ),
                     const SizedBox(height: 25),
 
-                    // 2. 🌟 شريط اختيار أيام الحج (Day Selector) 🌟
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true, // عشان يبدأ من اليمين
-                      child: Row(
-                        children: hajjDays.map((day) {
-                          bool isSelected = selectedDayKey == day['key'];
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedDayKey = day['key']!;
-                              });
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(left: 10),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 15,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFFA07B4F)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(
+                    // شريط الأيام
+                    Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: hajjDays.map((day) {
+                            bool isSelected = selectedDayKey == day['key'];
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedDayKey = day['key']!;
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(left: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 15,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
                                   color: isSelected
                                       ? const Color(0xFFA07B4F)
-                                      : Colors.white24,
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(15),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFFA07B4F)
+                                        : Colors.white24,
+                                  ),
+                                ),
+                                child: Text(
+                                  day['name']!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.white54,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                day['name']!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.white54,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 25),
-
-                    // 3. 🌟 قائمة المهام الديناميكية لليوم المحدد 🌟
                     const Text(
                       ': قائمة المهام اليومية',
                       style: TextStyle(
@@ -165,7 +144,7 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // رسم المهام أو رسالة إذا كان اليوم فارغ
+                    // المهام
                     if (currentDayTasks.isNotEmpty)
                       ...List.generate(currentDayTasks.length, (index) {
                         var task = currentDayTasks[index];
@@ -175,12 +154,10 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                             task['title'] ?? 'مهمة بدون عنوان',
                             task['is_completed'] ?? false,
                             (val) async {
-                              // 🌟 تحديث الداتابيس عند الضغط
                               List<dynamic> updatedTasks = List.from(
                                 currentDayTasks,
                               );
                               updatedTasks[index]['is_completed'] = val;
-
                               await FirebaseFirestore.instance
                                   .collection('Users')
                                   .doc(userId)
@@ -221,8 +198,6 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                       ),
 
                     const SizedBox(height: 40),
-
-                    // 4. خدمات إضافية (الأزرار الثابتة)
                     const Text(
                       'خدمات أضافية',
                       style: TextStyle(
@@ -262,7 +237,7 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                       () {},
                     ),
 
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 100), // مساحة عشان الشريط السفلي
                   ],
                 ),
               ),
@@ -272,8 +247,6 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
       ),
     );
   }
-
-  // === مكونات الواجهة (Widgets) ===
 
   Widget _buildTaskItem(
     String title,
@@ -302,9 +275,7 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
               style: TextStyle(
                 color: isChecked ? Colors.white38 : Colors.white,
                 fontSize: 14,
-                decoration: isChecked
-                    ? TextDecoration.lineThrough
-                    : null, // شطب النص إذا اكتمل
+                decoration: isChecked ? TextDecoration.lineThrough : null,
               ),
             ),
           ),
@@ -351,45 +322,6 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
             ),
             const SizedBox(width: 15),
             Icon(icon, color: Colors.white, size: 26),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return BottomAppBar(
-      color: const Color(0xFF1E1E1E).withOpacity(0.95),
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8.0,
-      child: SizedBox(
-        height: 60,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.person_outline, color: Colors.white54),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.directions_bus_outlined,
-                color: Colors.white54,
-              ),
-              onPressed: () {},
-            ),
-            const SizedBox(width: 40),
-            IconButton(
-              icon: const Icon(
-                Icons.chat_bubble_outline,
-                color: Colors.white54,
-              ),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.home, color: Color(0xFFA07B4F)),
-              onPressed: () {},
-            ),
           ],
         ),
       ),

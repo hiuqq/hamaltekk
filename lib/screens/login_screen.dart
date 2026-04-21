@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // 🌟 أضفنا است
 import 'create_screen.dart';
 import 'home_screen.dart';
 import 'staff_home_screen.dart'; // 🌟 أضفنا استيراد شاشة المشرف
+import 'package:hamaltekk/screens/staff_main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,29 +49,25 @@ class _LoginScreenState extends State<LoginScreen> {
         String userType =
             userDoc.get('type') ?? 'p'; // نفترض أنه حاج إذا لم نجد الحقل
 
+        // 🌟 ابحثي عن هذا الجزء في كودك وعدليه
         if (mounted) {
-          if (userType == 's') {
-            // توجيه المشرف
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const StaffHomeScreen()),
-            );
-          } else {
-            // توجيه الحاج
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            );
-          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => userType == 's'
+                  ? const StaffMainScreen() // ✅ التعديل هنا: نرسله للشاشة الأم اللي فيها البار
+                  : const HomeScreen(), // للحاج (سنعدلها لاحقاً بنفس الطريقة)
+            ),
+          );
         }
       } else {
         throw Exception('بيانات المستخدم غير موجودة في قاعدة البيانات');
       }
     } on FirebaseAuthException catch (e) {
       String message = 'حدث خطأ ما';
-      if (e.code == 'user-not-found')
+      if (e.code == 'user-not-found') {
         message = 'المستخدم غير موجود';
-      else if (e.code == 'wrong-password')
+      } else if (e.code == 'wrong-password')
         message = 'كلمة المرور خاطئة';
 
       if (mounted) {

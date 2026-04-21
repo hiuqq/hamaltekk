@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hamaltekk/models/user_model.dart';
 import 'package:hamaltekk/screens/home_screen.dart';
 import 'package:hamaltekk/screens/staff_home_screen.dart';
+import 'package:hamaltekk/screens/staff_main_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -132,8 +132,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                userType == 's' ? const StaffHomeScreen() : const HomeScreen(),
+            builder: (context) => userType == 's'
+                ? const StaffMainScreen() // التعديل هنا
+                : const HomeScreen(),
           ),
         );
       }

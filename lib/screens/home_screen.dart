@@ -778,10 +778,11 @@ class _QiblaScreenState extends State<QiblaScreen> {
           : StreamBuilder(
               stream: FlutterQiblah.qiblahStream,
               builder: (context, AsyncSnapshot<QiblahDirection> snapshot) {
-                if (!snapshot.hasData)
+                if (!snapshot.hasData) {
                   return const Center(
                     child: CircularProgressIndicator(color: Color(0xFFA07B4F)),
                   );
+                }
                 final qiblahDirection = snapshot.data!;
                 final bool isAligned = qiblahDirection.offset.abs() < 5;
 
