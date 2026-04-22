@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // مكتبة Firebase الأساسية
 import 'firebase_options.dart'; // الملف الذي تم توليده بواسطة FlutterFire CLI
 
-// استيراد الشاشات - تأكد من مطابقة الأسماء للملفات الموجودة في مجلد screens
+// استيراد الشاشات
 import 'package:hamaltekk/screens/logo_screen.dart';
 import 'package:hamaltekk/screens/login_screen.dart';
 import 'package:hamaltekk/screens/create_screen.dart';
 import 'package:hamaltekk/screens/otp_screen.dart';
-import 'package:hamaltekk/screens/chat_screen.dart';
 import 'package:hamaltekk/screens/home_screen.dart';
+import 'package:hamaltekk/screens/pilgrim_main_screen.dart'; // 🌟 إضافة استيراد الشاشة الحاضنة الجديدة
 
 void main() async {
   // 1. التأكد من تهيئة روابط Flutter قبل أي شيء
@@ -46,7 +46,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
 
-        // التصحيح النهائي: استخدام CardThemeData لحل خطأ argument_type_not_assignable
+        // إعدادات الكروت (Cards)
         cardTheme: CardThemeData(
           color: Colors.black.withOpacity(0.8),
           elevation: 5,
@@ -56,17 +56,18 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // 🏁 أول شاشة تظهر عند تشغيل التطبيق (اللوقو)
+      // 🏁 التعديل الجوهري: جعل PilgrimMainScreen هي نقطة الانطلاق لظهور البار السفلي
+      // يمكنك إعادتها إلى LogoScreen() لاحقاً إذا كنت تريد عرض اللوقو أولاً ثم الانتقال برمجياً
       home: const LogoScreen(),
 
       // تعريف المسارات (Routes) للتنقل بين الشاشات
       routes: {
+        '/main': (context) => const PilgrimMainScreen(), // مسار الشاشة الحاضنة
         '/home': (context) => const HomeScreen(),
         '/logo': (context) => const LogoScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
         '/otp': (context) => const OtpScreen(),
-        '/chat': (context) => const CommunicationScreen(),
       },
     );
   }

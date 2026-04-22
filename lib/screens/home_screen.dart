@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 // =============================================================
 // الجزء 1: دوال جلب البيانات
@@ -165,16 +166,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<String> fetchSupervisorFromDB(String? groupId) async {
     if (groupId == null) return "غير معين";
     try {
-      // 1. القفزة الأولى: الحصول على sup_id من الجروب (مثلاً: "901")
       var groupDoc = await FirebaseFirestore.instance
           .collection('Groups')
           .doc(groupId)
           .get();
-
       String? supIdInGroup = groupDoc.data()?['sup_id'];
       if (supIdInGroup == null) return "لم يتم تحديد رقم مشرف";
 
-      // 2. القفزة الثانية: البحث في كولكشن Staff عن الوثيقة التي فيها j_no مطابق لـ supIdInGroup
       var staffQuery = await FirebaseFirestore.instance
           .collection('Staff')
           .where('j_no', isEqualTo: supIdInGroup)
@@ -182,7 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
 
       if (staffQuery.docs.isNotEmpty) {
-        // نأخذ الاسم من أول وثيقة مطابقة نجدها
         return staffQuery.docs.first.data()['name'] ?? "مشرف بدون اسم";
       } else {
         return "المشرف $supIdInGroup غير موجود";
@@ -192,7 +189,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // دالة تنظيف المسميات
   String formatLabel(String rawId, String prefix, String replaceWith) {
     return rawId.replaceAll(prefix, replaceWith).replaceAll('_', ' ');
   }
@@ -264,12 +260,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
           var userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
 
-          // القراءة من المسارات الصحيحة الجديدة
           String userName = userData['info']?['name'] ?? 'الحاج';
-          String nusukId = userData['ref_no'] ?? '123456';
           String? groupId = userData['group_id'];
-          // 🌟 صناعة رابط فريد خاص بهذا الحاج بناءً على رقم النسك حقه
-          String uniqueQrLink = "https://hamlatuk.com/pilgrim/$nusukId";
 
           return Container(
             decoration: const BoxDecoration(
@@ -294,7 +286,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    // جلب اسم المشرف
                     FutureBuilder<String>(
                       future: fetchSupervisorFromDB(groupId),
                       builder: (context, supSnapshot) {
@@ -309,19 +300,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                     const SizedBox(height: 30),
-                    _buildQRCodeSection(uniqueQrLink),
+
+                    // 🌟 تمرير الـ userId للباركود لضمان توافقه مع نظام المشرف
+                    _buildQRCodeSection(userId ?? ''),
 
                     const SizedBox(height: 30),
                     _buildSectionTitle('معلومات التسكين'),
                     const SizedBox(height: 15),
 
-                    // --- كروت التسكين ---
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       reverse: true,
                       child: Row(
                         children: [
-                          // 1. كارد مزدلفة
                           if (userData.containsKey('housing_muzdalifa'))
                             _buildInfoCard(
                               context,
@@ -346,7 +337,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           else
                             _buildEmptyCard('مزدلفة'),
 
-                          // 2. كارد عرفة
                           if (userData.containsKey('housing_arafat'))
                             _buildInfoCard(
                               context,
@@ -370,7 +360,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           else
                             _buildEmptyCard('عرفة'),
 
-                          // 3. كارد منى
                           if (userData.containsKey('housing_mina'))
                             _buildInfoCard(
                               context,
@@ -409,11 +398,56 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
   // --- Widgets ---
+
+  // 🌟 تحديث سكشن الباركود ليستخدم QrImageView
+  Widget _buildQRCodeSection(String qrData) {
+    return Center(
+      child: Column(
+        children: [
+          const Text(
+            'رمز التصعيد الخاص بي',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFA07B4F),
+                width: 2,
+              ), // إطار ذهبي خفيف
+            ),
+            child: QrImageView(
+              data: qrData, // الـ ID حق الحاج
+              version: QrVersions.auto,
+              size: 200.0,
+              backgroundColor:
+                  Colors.white, // خلفية بيضاء عشان الكاميرا تقرأه بسرعة
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'أبرز هذا الرمز للمشرف عند صعود الحافلة',
+            style: TextStyle(
+              color: Color(0xFFA07B4F),
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildInfoCard(
     BuildContext context,
@@ -659,64 +693,6 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 4),
         Container(height: 2, width: 40, color: const Color(0xFFA07B4F)),
       ],
-    );
-  }
-
-  Widget _buildQRCodeSection(String qrData) {
-    // 🌟 تشفير الرابط عشان الـ API حق الصور يقبله بدون مشاكل
-    String encodedData = Uri.encodeComponent(qrData);
-
-    return Center(
-      child: Column(
-        children: [
-          const Text(
-            'الرمز الخاص بي',
-            style: TextStyle(color: Colors.white, fontSize: 18),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Image.network(
-              'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=$encodedData',
-              width: 200,
-              height: 200,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
-      child: Container(
-        height: 65,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E).withOpacity(0.95),
-          borderRadius: BorderRadius.circular(35),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            const Icon(Icons.person_outline, color: Colors.white54),
-            const Icon(Icons.directions_bus_outlined, color: Colors.white54),
-            const Icon(Icons.chat_bubble_outline, color: Colors.white54),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFA07B4F),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.home, color: Colors.white),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

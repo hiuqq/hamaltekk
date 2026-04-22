@@ -39,7 +39,7 @@ dependencies:
   intl: ^0.19.0
   url_launcher: ^6.2.6     # عشان نفتح خرائط جوجل
   mobile_scanner: ^3.5.5   # عشان نفتح الكاميرا ونقرأ الباركود
-
+  qr_flutter: ^4.1.0
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8

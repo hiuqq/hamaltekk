@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hamaltekk/widgets/hajj_info_overlays.dart'; // 🌟 استدعاء الكلاس حقك
 
 class PilgrimsBoardingScreen extends StatelessWidget {
   final String tripId;
@@ -22,12 +23,13 @@ class PilgrimsBoardingScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // الخلفية
+          // الخلفية الفخمة
           Positioned.fill(
             child: Image.asset('assets/black.png', fit: BoxFit.cover),
           ),
 
           StreamBuilder<QuerySnapshot>(
+            // 🌟 نقرأ من قائمة ركاب الرحلة الحالية
             stream: FirebaseFirestore.instance
                 .collection('Trips')
                 .doc(tripId)
@@ -49,6 +51,8 @@ class PilgrimsBoardingScreen extends StatelessWidget {
               }
 
               var allPilgrims = snapshot.data!.docs;
+
+              // تقسيمهم حسب حالة التصعيد
               var boarded = allPilgrims
                   .where(
                     (p) =>
@@ -67,36 +71,38 @@ class PilgrimsBoardingScreen extends StatelessWidget {
               return Column(
                 children: [
                   _buildTopStats(boarded.length, waiting.length),
+
                   Expanded(
                     child: Directionality(
                       textDirection: TextDirection.rtl,
                       child: ListView(
-                        padding: const EdgeInsets.all(15),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 20,
+                        ),
                         children: [
                           _buildSectionHeader(
                             'بانتظار التصعيد',
                             waiting.length,
                             const Color(0xFFE53935),
                           ),
+                          const SizedBox(height: 10),
+                          // 🌟 استدعاء الكرت الموحد للحجاج في الانتظار
                           ...waiting.map(
-                            (doc) => PilgrimListTile(
-                              pilgrimId: doc.id,
-                              statusColor: const Color(0xFFE53935),
-                              isBoarded: false,
-                            ),
+                            (doc) => UnifiedPilgrimCard(pilgrimId: doc.id),
                           ),
-                          const SizedBox(height: 25),
+
+                          const SizedBox(height: 30),
+
                           _buildSectionHeader(
                             'تم التصعيد',
                             boarded.length,
                             const Color(0xFF4CAF50),
                           ),
+                          const SizedBox(height: 10),
+                          // 🌟 استدعاء الكرت الموحد للحجاج اللي تم تصعيدهم
                           ...boarded.map(
-                            (doc) => PilgrimListTile(
-                              pilgrimId: doc.id,
-                              statusColor: const Color(0xFF4CAF50),
-                              isBoarded: true,
-                            ),
+                            (doc) => UnifiedPilgrimCard(pilgrimId: doc.id),
                           ),
                         ],
                       ),
@@ -163,39 +169,49 @@ class PilgrimsBoardingScreen extends StatelessWidget {
 
   Widget _buildSectionHeader(String title, int count, Color color) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Container(width: 4, height: 18, color: color),
-          const SizedBox(width: 10),
           Text(
             title,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Spacer(),
-          Text('$count حجاج', style: TextStyle(color: color, fontSize: 12)),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$count حاج',
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// 🌟 الويدجت الخاص بكل حاج (مع زر الـ Overlay)
-class PilgrimListTile extends StatelessWidget {
+// ============================================================================
+// 🌟 الكرت الموحد (نسخة طبق الأصل من تصميمك)
+// ============================================================================
+// ============================================================================
+// 🌟 الكرت الموحد (تم تعديل الترتيب: الاسم يمين والأيقونات يسار)
+// ============================================================================
+class UnifiedPilgrimCard extends StatelessWidget {
   final String pilgrimId;
-  final Color statusColor;
-  final bool isBoarded;
 
-  const PilgrimListTile({
-    super.key,
-    required this.pilgrimId,
-    required this.statusColor,
-    required this.isBoarded,
-  });
+  const UnifiedPilgrimCard({super.key, required this.pilgrimId});
 
   @override
   Widget build(BuildContext context) {
@@ -206,185 +222,80 @@ class PilgrimListTile extends StatelessWidget {
           .get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox();
-        var userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-        var info = userData['info'] ?? {};
+
+        var pilgrimData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+        String name = pilgrimData['info']?['name'] ?? 'حاج بدون اسم';
+
+        List rawDiseases = pilgrimData['info']?['dis'] ?? [];
+        List cleanDiseases = rawDiseases
+            .where((element) => element.toString().trim().isNotEmpty)
+            .toList();
+        bool isCritical = cleanDiseases.isNotEmpty;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E).withOpacity(0.7),
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: statusColor.withOpacity(0.2)),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 15,
-              vertical: 5,
-            ),
-            leading: CircleAvatar(
-              backgroundColor: statusColor.withOpacity(0.1),
-              child: Icon(
-                isBoarded ? Icons.check_circle : Icons.hourglass_top_rounded,
-                color: statusColor,
-              ),
-            ),
-            title: Text(
-              info['name'] ?? 'حاج بدون اسم',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'تصريح: $pilgrimId',
-              style: const TextStyle(color: Colors.white38, fontSize: 11),
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.info_outline, color: Color(0xFFA07B4F)),
-              onPressed: () {
-                // 🌟 إظهار الـ Overlay عند الضغط
-                _showPilgrimOverlay(context, userData);
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // 🌟 دالة إظهار الـ Overlay (النافذة المنبثقة)
-  void _showPilgrimOverlay(
-    BuildContext context,
-    Map<String, dynamic> userData,
-  ) {
-    var info = userData['info'] ?? {};
-    var health = userData['health_info'] ?? {};
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFFA07B4F).withOpacity(0.5),
-              ),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20),
-              ],
-            ),
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // الهيدر
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.medical_information,
-                        color: Color(0xFFA07B4F),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'تفاصيل الحاج الصحية',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white54),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+            gradient: LinearGradient(
+              colors: isCritical
+                  ? [
+                      const Color(0xFF7B241C).withOpacity(0.9),
+                      const Color(0xFF44130E).withOpacity(0.9),
+                    ]
+                  : [
+                      const Color(0xFF2D3E33).withOpacity(0.9),
+                      const Color(0xFF1E2721).withOpacity(0.9),
                     ],
-                  ),
-                  const Divider(color: Colors.white10, height: 25),
-
-                  // معلومات الحاج
-                  _buildDetailItem(Icons.person, 'الاسم', info['name'] ?? '-'),
-                  _buildDetailItem(
-                    Icons.phone,
-                    'رقم التواصل',
-                    info['phone'] ?? '-',
-                  ),
-                  _buildDetailItem(
-                    Icons.bloodtype,
-                    'فصيلة الدم',
-                    health['blood_type'] ?? '-',
-                  ),
-                  _buildDetailItem(
-                    Icons.medical_services,
-                    'الحالة الصحية',
-                    health['condition'] ?? 'سليم',
-                  ),
-                  _buildDetailItem(
-                    Icons.warning_amber_rounded,
-                    'الحساسية',
-                    health['allergies'] ?? 'لا يوجد',
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // زر الإغلاق
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFA07B4F),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'تم المراجعة',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
+            border: Border.all(color: Colors.white10, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              // 1. اسم الحاج (صار في البداية عشان يجي يمين)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 5),
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1, // عشان لو الاسم طويل ما ينزل سطر ثاني
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+
+              // 2. أيقونة المعلومات الشخصية
+              IconButton(
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: Colors.white70,
+                  size: 22,
+                ),
+                onPressed: () =>
+                    HajjInfoOverlays.showInfoCard(context, pilgrimData),
+              ),
+
+              // 3. أيقونة المعلومات الطبية (صارت في الأخير عشان تجي يسار)
+              IconButton(
+                icon: Icon(
+                  Icons.medical_services_outlined,
+                  color: isCritical ? Colors.redAccent : Colors.white70,
+                  size: 22,
+                ),
+                onPressed: () =>
+                    HajjInfoOverlays.showHealthCard(context, pilgrimData),
+              ),
+            ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildDetailItem(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: const Color(0xFFA07B4F).withOpacity(0.7)),
-          const SizedBox(width: 12),
-          Text(
-            '$label: ',
-            style: const TextStyle(color: Colors.white54, fontSize: 13),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

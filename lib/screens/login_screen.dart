@@ -5,6 +5,7 @@ import 'create_screen.dart';
 import 'home_screen.dart';
 import 'staff_home_screen.dart'; // 🌟 أضفنا استيراد شاشة المشرف
 import 'package:hamaltekk/screens/staff_main_screen.dart';
+import 'package:hamaltekk/screens/pilgrim_main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -55,8 +56,8 @@ class _LoginScreenState extends State<LoginScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => userType == 's'
-                  ? const StaffMainScreen() // ✅ التعديل هنا: نرسله للشاشة الأم اللي فيها البار
-                  : const HomeScreen(), // للحاج (سنعدلها لاحقاً بنفس الطريقة)
+                  ? const StaffMainScreen() // للمشرف
+                  : const PilgrimMainScreen(), // ✅ التعديل هنا: نرسل الحاج للشاشة اللي فيها البار
             ),
           );
         }
