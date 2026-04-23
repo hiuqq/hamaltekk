@@ -82,35 +82,29 @@ class PilgrimTripsScreen extends StatelessWidget {
                           return _buildEmptyState();
                         }
 
-                        // 🌟 الفلتر الذكي: إخفاء التمبلت الفاضي إذا فيه رحلة معبأة
+                        // الفلتر الذكي: إخفاء التمبلت إذا فيه رحلة معبأة
                         Map<String, DocumentSnapshot> uniqueTrips = {};
 
                         for (var doc in tripSnapshot.data!.docs) {
                           var data = doc.data() as Map<String, dynamic>;
-                          String templateId =
-                              data['template_id'] ??
-                              doc.id; // نستخدم التمبلت كمعرف
+                          String templateId = data['template_id'] ?? doc.id;
 
                           if (uniqueTrips.containsKey(templateId)) {
-                            // إذا لقينا رحلة مكررة لنفس الوجهة، نتحقق مين فيها تاريخ ونعتمدها
                             var existingData =
                                 uniqueTrips[templateId]!.data()
                                     as Map<String, dynamic>;
                             if (data['scheduled_at'] != null &&
                                 existingData['scheduled_at'] == null) {
-                              uniqueTrips[templateId] =
-                                  doc; // نستبدل الفاضي بالمليان
+                              uniqueTrips[templateId] = doc;
                             }
                           } else {
-                            uniqueTrips[templateId] =
-                                doc; // إذا مو مكررة، نضيفها عادي
+                            uniqueTrips[templateId] = doc;
                           }
                         }
 
-                        // تحويل الماب إلى قائمة بعد التصفية
                         var trips = uniqueTrips.values.toList();
 
-                        // 🌟 ترتيب الرحلات زمنياً
+                        // ترتيب الرحلات زمنياً
                         trips.sort((a, b) {
                           Timestamp? timeA =
                               (a.data()
@@ -119,8 +113,7 @@ class PilgrimTripsScreen extends StatelessWidget {
                               (b.data()
                                   as Map<String, dynamic>)['scheduled_at'];
                           if (timeA == null && timeB == null) return 0;
-                          if (timeA == null)
-                            return 1; // نخلي اللي بدون تاريخ تنزل تحت
+                          if (timeA == null) return 1;
                           if (timeB == null) return -1;
                           return timeA.compareTo(timeB);
                         });
@@ -242,7 +235,7 @@ class PilgrimTripsScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 🌟 زر الموقع (تم تحديث آلية الفتح لضمان التوافق)
+          // 🌟 زر الموقع التفاعلي
           GestureDetector(
             onTap: () => _openGoogleMaps(context, tripData),
             child: Column(
@@ -337,27 +330,40 @@ class PilgrimTripsScreen extends StatelessWidget {
     );
   }
 
-  // 🌟 الكود السحري لفتح الخرائط على كل الأجهزة
+  // 🌟 الدالة السحرية النهائية: تقرأ الموقع من الرحلة نفسها وتفتح الخريطة بدبوس أحمر!
   Future<void> _openGoogleMaps(
     BuildContext context,
     Map<String, dynamic> tripData,
   ) async {
-    double lat = tripData['bus_lat'] ?? 21.4133; // منى افتراضياً
-    double lng = tripData['bus_lng'] ?? 39.8933; // منى افتراضياً
+    // 1. نقرأ الإحداثيات من نفس الرحلة اللي حددها المشرف
+    double? lat = tripData['bus_lat'];
+    double? lng = tripData['bus_lng'];
 
-    // استخدمنا رابط الويب العالمي اللي يدعمه أندرويد و iOS فوراً
-    final String googleMapsUrl =
-        'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-    final Uri url = Uri.parse(googleMapsUrl);
+    // 2. إذا مافيه إحداثيات (المشرف ما أضاف موقع)
+    if (lat == null || lng == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لم يتم تحديث موقع الحافلة لهذه الرحلة حتى الآن.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
 
     try {
-      // إجبار فتح الرابط في التطبيق الخارجي
+      // 3. رابط قوقل ماب العالمي مع وضع دبوس (Pin) على الموقع الدقيق
+      final String googleMapsUrl =
+          'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+      final Uri url = Uri.parse(googleMapsUrl);
+
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('عذراً، لم نتمكن من فتح الخريطة.'),
+            content: Text('حدث خطأ أثناء فتح الخريطة.'),
             backgroundColor: Colors.redAccent,
           ),
         );

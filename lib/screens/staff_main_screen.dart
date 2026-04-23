@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hamaltekk/screens/staff_home_screen.dart';
 import 'package:hamaltekk/screens/staff_trips_screen.dart';
+import 'package:hamaltekk/screens/staff_chat_list_screen.dart';
 
 class StaffMainScreen extends StatefulWidget {
   const StaffMainScreen({super.key});
@@ -14,12 +15,7 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
 
   final List<Widget> _screens = [
     const StaffHomeScreen(),
-    const Center(
-      child: Text(
-        'شاشة المحادثات قريباً',
-        style: TextStyle(color: Colors.white),
-      ),
-    ),
+    const Center(child: StaffChatListScreen()),
     const StaffTripsScreen(),
     const Center(
       child: Text(

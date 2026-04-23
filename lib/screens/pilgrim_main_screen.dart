@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hamaltekk/screens/home_screen.dart'; // مسار شاشتك الرئيسية
-import 'package:hamaltekk/screens/pilgrim_trips_screen.dart'; // مسار شاشة الرحلات
+import 'package:hamaltekk/screens/home_screen.dart';
+import 'package:hamaltekk/screens/pilgrim_trips_screen.dart';
+import 'package:hamaltekk/screens/pilgrim_chat_list_screen.dart'; // 🌟 أضفنا استيراد شاشة قائمة المحادثات
 
 class PilgrimMainScreen extends StatefulWidget {
   const PilgrimMainScreen({super.key});
@@ -10,24 +11,19 @@ class PilgrimMainScreen extends StatefulWidget {
 }
 
 class _PilgrimMainScreenState extends State<PilgrimMainScreen> {
-  // 🌟 خلينا البداية 0 عشانها مرتبطة بـ HomeScreen بناءً على ترتيبك
   int _currentIndex = 0;
 
+  // 🌟 تحديث قائمة الشاشات لتبديل "قريباً" بالشاشة الفعلية
   final List<Widget> _screens = [
     const HomeScreen(), // 0: الرئيسية (Home)
-    const Center(
-      child: Text(
-        'شاشة المحادثات قريباً',
-        style: TextStyle(color: Colors.white),
-      ),
-    ), // 1: المحادثات
+    const PilgrimChatListScreen(), // 1: المحادثات (تم الربط هنا ✅)
     const PilgrimTripsScreen(), // 2: الرحلات
     const Center(
       child: Text(
         'شاشة الملف الشخصي قريباً',
         style: TextStyle(color: Colors.white),
       ),
-    ), // 3: الملف الشخصي
+    ), // 3: الملف الشخصي (مكان شاشة الهوية والملاحظات لاحقاً)
   ];
 
   @override
@@ -38,11 +34,10 @@ class _PilgrimMainScreenState extends State<PilgrimMainScreen> {
 
       body: IndexedStack(index: _currentIndex, children: _screens),
 
-      // 🌟 البار السفلي مع التوهج الذهبي (نفس المشرف بالضبط بس بدون الفراغ اللي بالنص)
       bottomNavigationBar: BottomAppBar(
         color: const Color(0xFF1E1E1E).withOpacity(0.98),
         elevation: 20,
-        shadowColor: const Color(0xFFA07B4F), // التوهج الذهبي
+        shadowColor: const Color(0xFFA07B4F),
         child: SizedBox(
           height: 60,
           child: Row(
@@ -54,8 +49,6 @@ class _PilgrimMainScreenState extends State<PilgrimMainScreen> {
                 Icons.directions_bus,
                 2,
               ),
-
-              // تم إزالة الفراغ (SizedBox) الخاص بزر الكاميرا هنا ليصبح التوزيع متساوي
               _buildNavItem(Icons.chat_bubble_outline, Icons.chat_bubble, 1),
               _buildNavItem(Icons.home_outlined, Icons.home, 0),
             ],
@@ -65,7 +58,6 @@ class _PilgrimMainScreenState extends State<PilgrimMainScreen> {
     );
   }
 
-  // 🌟 نفس دالتك بالضبط لضمان توحيد شكل الأيقونات وتكبيرها عند الضغط
   Widget _buildNavItem(IconData outlineIcon, IconData filledIcon, int index) {
     bool isSelected = _currentIndex == index;
     return IconButton(

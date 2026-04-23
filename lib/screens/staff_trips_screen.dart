@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hamaltekk/screens/scanner_screen.dart';
-import 'package:hamaltekk/screens/pilgrims_boarding_screen.dart'; // 🌟 تأكدي من إضافة هذا الإمبورت
+import 'package:hamaltekk/screens/pilgrims_boarding_screen.dart';
 import 'package:hamaltekk/widgets/add_trip_dialog.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
@@ -163,20 +163,96 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(bottom: 80, left: 20, right: 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
+  // 🌟 الدالة المعدلة: تحدث الحالة وتستدعي دالة الأتمتة
   Future<void> _updateTripStatus(String newStatus) async {
     try {
+      // 1. تحديث حالة الرحلة في قاعدة البيانات
       await FirebaseFirestore.instance
           .collection('Trips')
           .doc(widget.tripId)
           .update({'status': newStatus});
-      _showCustomSnackBar('تم تحديث الحالة بنجاح ✅', Colors.green);
+
+      // 🌟 2. تشغيل الأتمتة: إرسال الرسائل للكل تلقائياً
+      await _sendAutomatedSystemMessage(newStatus);
+
+      _showCustomSnackBar(
+        'تم تحديث الحالة وإرسال الإشعارات بنجاح ✅',
+        Colors.green,
+      );
     } catch (e) {
       _showCustomSnackBar('حدث خطأ أثناء التحديث', Colors.red);
+    }
+  }
+
+  // 🌟 دالة الأتمتة: تقرأ المانيفست وترسل رسالة للجميع في جزء من الثانية
+  Future<void> _sendAutomatedSystemMessage(String newStatus) async {
+    final String? supervisorId = FirebaseAuth.instance.currentUser?.uid;
+    if (supervisorId == null) return;
+
+    final firestore = FirebaseFirestore.instance;
+    String messageText = '';
+
+    // نحدد نص الرسالة بناءً على الحالة الجديدة
+    if (newStatus == 'active') {
+      messageText =
+          '🚌 إشعار نظام: بدأت الرحلة الآن، نرجو التوجه للحافلة فوراً.';
+    } else if (newStatus == 'completed') {
+      messageText = '✅ إشعار نظام: انتهت الرحلة بسلام، تقبل الله طاعتكم.';
+    } else {
+      return; // لو الحالة 'scheduled' ما نرسل شيء للمحادثة
+    }
+
+    try {
+      // نجيب قائمة الحجاج اللي في هذي الرحلة بس من (manifest)
+      var manifestSnapshot = await firestore
+          .collection('Trips')
+          .doc(widget.tripId)
+          .collection('manifest')
+          .get();
+
+      if (manifestSnapshot.docs.isEmpty) return;
+
+      // نفتح Batch عشان نرسل كل الرسايل كدفعة وحدة بدون ما يعلق التطبيق
+      WriteBatch batch = firestore.batch();
+
+      for (var doc in manifestSnapshot.docs) {
+        String pilgrimId = doc.id;
+        String chatId = '${supervisorId}_$pilgrimId'; // الغرفة المشتركة بينهم
+
+        var messageRef = firestore
+            .collection('Chats')
+            .doc(chatId)
+            .collection('messages')
+            .doc();
+
+        // إضافة الرسالة
+        batch.set(messageRef, {
+          'text': messageText,
+          'sender_id': supervisorId, // كأن المشرف هو اللي أرسلها
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': 'system_alert', // بتطلع باللون الذهبي المميز اللي صممناه
+        });
+
+        // تحديث الشاشة الخارجية لقائمة المحادثات عشان تظهر آخر رسالة
+        var chatRef = firestore.collection('Chats').doc(chatId);
+        batch.set(chatRef, {
+          'last_message': messageText,
+          'last_time': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      // إرسال الدفعة بالكامل
+      await batch.commit();
+      print(
+        '🚀 تم إرسال رسائل النظام الأوتوماتيكية بنجاح لعدد ${manifestSnapshot.docs.length} حاج',
+      );
+    } catch (e) {
+      print('🚨 حدث خطأ في الأتمتة: $e');
     }
   }
 
@@ -420,7 +496,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                     ),
                   ),
                   onPressed: () {
-                    // 🌟 تفعيل الانتقال لشاشة الحجاج
                     Navigator.push(
                       context,
                       MaterialPageRoute(

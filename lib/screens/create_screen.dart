@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hamaltekk/screens/home_screen.dart';
-import 'package:hamaltekk/screens/staff_home_screen.dart';
-import 'package:hamaltekk/screens/staff_main_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // 🌟 ضروري للإشعارات
+import 'package:hamaltekk/screens/login_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -31,9 +30,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
-      print("🚀 بدء فحص الرقم: $refNo");
+      // 1. 🔔 جلب رمز الإشعارات (FCM Token)
+      String? fcmToken;
+      try {
+        fcmToken = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        print("⚠️ تنبيه: فشل جلب التوكن (تأكد من إعدادات Firebase Messaging)");
+      }
 
-      // 1. التحقق من كولكشن الحجاج (Nusk)
+      // 2. التحقق من كولكشن الحجاج (Nusk)
       var nuskDoc = await FirebaseFirestore.instance
           .collection('Nusk')
           .doc(refNo)
@@ -41,14 +46,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       String userType = '';
       Map<String, dynamic> infoData = {};
-      Map<String, dynamic> activeHajjTasks = {}; // لتخزين المهام النشطة
+      Map<String, dynamic> activeHajjTasks = {};
 
       if (nuskDoc.exists) {
         userType = 'p'; // حاج
         infoData = nuskDoc.data()!;
-        print("✅ تم العثور على حاج");
       } else {
-        // 2. التحقق من كولكشن المشرفين (Staff)
+        // 3. التحقق من كولكشن المشرفين (Staff)
         var staffDoc = await FirebaseFirestore.instance
             .collection('Staff')
             .doc(refNo)
@@ -57,9 +61,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (staffDoc.exists) {
           userType = 's'; // مشرف
           infoData = staffDoc.data()!;
-          print("✅ تم العثور على مشرف");
 
-          // 🌟 سحب قوالب المهام وتحويلها لمهام نشطة (is_completed: false)
+          // سحب قوالب المهام وتحويلها لمهام نشطة
           var templates = staffDoc.data()?['task_templates'];
           if (templates != null && templates is Map) {
             templates.forEach((dayKey, taskList) {
@@ -74,9 +77,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     .toList();
               }
             });
-            print("📋 تم تجهيز ${activeHajjTasks.length} أيام من المهام");
-          } else {
-            print("⚠️ تنبيه: حقل task_templates غير موجود في ملف المشرف");
           }
         } else {
           _showSnackBar('رقم التصريح أو الرقم الوظيفي غير موجود');
@@ -85,13 +85,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
 
-      // 3. إنشاء الحساب في Firebase Auth
+      // 4. إنشاء الحساب في Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // 4. خوارزمية التعيين التلقائي للجروبات (للحجاج فقط)
+      String uid = userCredential.user!.uid;
+
+      // 5. 🔍 خوارزمية التعيين التلقائي للجروبات
       String? assignedGroupId;
+
       if (userType == 'p') {
+        // للحاج: تعيين تلقائي بناءً على السعة
         var groupsSnapshot = await FirebaseFirestore.instance
             .collection('Groups')
             .get();
@@ -105,48 +109,61 @@ class _SignUpScreenState extends State<SignUpScreen> {
             break;
           }
         }
+      } else if (userType == 's') {
+        // 🛠️ للمشرف: البحث عن المجموعة باستخدام حقل sup_id
+        var groupQuery = await FirebaseFirestore.instance
+            .collection('Groups')
+            .where('sup_id', isEqualTo: refNo)
+            .limit(1)
+            .get();
+
+        if (groupQuery.docs.isNotEmpty) {
+          assignedGroupId = groupQuery.docs.first.id;
+          print("✅ تم ربط المشرف بالجروب: $assignedGroupId");
+        }
       }
 
-      // 5. حفظ البيانات النهائية في كولكشن (Users)
-      // ندمج المهام النشطة داخل حقل info للمشرف
+      // 6. حفظ البيانات النهائية في كولكشن (Users)
       if (userType == 's') {
         infoData['active_hajj_tasks'] = activeHajjTasks;
       }
 
-      await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(userCredential.user!.uid)
-          .set({
-            'email': email,
-            'type': userType,
-            'refNo': refNo,
-            'info': infoData,
-            'group_id': assignedGroupId,
-            'createdAt': Timestamp.now(),
-          });
+      await FirebaseFirestore.instance.collection('Users').doc(uid).set({
+        'uid': uid,
+        'email': email,
+        'type': userType,
+        'refNo': refNo,
+        'info': infoData,
+        'group_id': assignedGroupId,
+        'fcm_token': fcmToken, // 🌟 حفظ التوكن للإشعارات
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-      print("✨ تم حفظ بيانات المستخدم بنجاح في كولكشن Users");
+      // 7. 🚪 تسجيل خروج وتحويل لشاشة تسجيل الدخول
+      await FirebaseAuth.instance.signOut();
 
-      // 6. التوجيه الذكي
       if (mounted) {
-        Navigator.pushReplacement(
+        _showSnackBar('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول 🔑');
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder: (context) => userType == 's'
-                ? const StaffMainScreen() // التعديل هنا
-                : const HomeScreen(),
-          ),
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
-      _showSnackBar(
-        e.code == 'email-already-in-use'
-            ? 'الإيميل مسجل مسبقاً'
-            : 'حدث خطأ في التسجيل',
-      );
+      if (e.code == 'email-already-in-use') {
+        _showSnackBar('لديك حساب بالفعل! جاري تحويلك لتسجيل الدخول..');
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+      } else {
+        _showSnackBar('خطأ في التسجيل: ${e.message}');
+      }
     } catch (e) {
-      print("🚨 خطأ غير متوقع: $e");
-      _showSnackBar('خطأ غير متوقع: $e');
+      _showSnackBar('حدث خطأ غير متوقع: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -157,6 +174,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       SnackBar(
         content: Text(msg, textAlign: TextAlign.right),
         backgroundColor: const Color(0xFFA07B4F),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -178,12 +197,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
             child: Container(
               height: kaabaHeight,
               width: double.infinity,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(40),
-                  topRight: Radius.circular(40),
-                ),
-              ),
               child: ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(40),
@@ -260,7 +273,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             : _buildGradientButton('تسجيل', _handleSignUp),
                         const SizedBox(height: 15),
                         GestureDetector(
-                          onTap: () => Navigator.pop(context),
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LoginScreen(),
+                              ),
+                            );
+                          },
                           child: const Text(
                             'لديك حساب بالفعل؟ تسجيل دخول',
                             style: TextStyle(

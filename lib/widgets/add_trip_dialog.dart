@@ -32,7 +32,16 @@ class _AddTripDialogState extends State<AddTripDialog> {
       selectedBusId = widget.initialData!['bus_id'];
       selectedDateTime = (widget.initialData!['scheduled_at'] as Timestamp)
           .toDate();
-      isLocationFetched = true;
+
+      // 🌟 التعديل الأول: التحقق إذا كانت الرحلة لها موقع مسبقاً عشان نحدث حالة الزر
+      if (widget.initialData!['bus_lat'] != null &&
+          widget.initialData!['bus_lng'] != null) {
+        busLocation = GeoPoint(
+          widget.initialData!['bus_lat'],
+          widget.initialData!['bus_lng'],
+        );
+        isLocationFetched = true;
+      }
     }
   }
 
@@ -133,26 +142,28 @@ class _AddTripDialogState extends State<AddTripDialog> {
         'created_by': FirebaseAuth.instance.currentUser?.uid,
       };
 
+      // 🌟 التعديل الثاني: إضافة الإحداثيات للفايربيس كأرقام زي ما اتفقنا
+      if (busLocation != null) {
+        data['bus_lat'] = busLocation!.latitude;
+        data['bus_lng'] = busLocation!.longitude;
+      }
+
       await firestore
           .collection('Trips')
           .doc(tripDocId)
           .set(data, SetOptions(merge: true));
 
-      // 🌟 2. السحر هنا: إنشاء (Manifest) قائمة ركاب الرحلة تلقائياً!
-      // إذا كانت إضافة جديدة (مو تعديل)، نسحب الحجاج ونضيفهم للرحلة
+      // 2. إنشاء (Manifest) قائمة ركاب الرحلة تلقائياً!
       if (widget.tripId == null) {
-        // نجيب كل الحجاج اللي في هذا القروب من كولكشن اليوزرز
         var usersSnapshot = await firestore
             .collection('Users')
             .where('group_id', isEqualTo: selectedGroupId)
             .get();
 
-        // نستخدم Batch (حفظ دفعة واحدة) عشان يكون سريع وما يعلق التطبيق
         WriteBatch batch = firestore.batch();
 
         for (var doc in usersSnapshot.docs) {
           var userData = doc.data();
-          // ننشئ ملف لكل حاج داخل مجموعة manifest التابعة لهذي الرحلة
           var manifestRef = firestore
               .collection('Trips')
               .doc(tripDocId)
@@ -160,14 +171,13 @@ class _AddTripDialogState extends State<AddTripDialog> {
               .doc(doc.id);
 
           batch.set(manifestRef, {
-            'name':
-                userData['info']?['name'] ?? 'بدون اسم', // سحبنا الاسم للسهولة
-            'status': 'waiting', // الحالة الافتراضية: بانتظار التصعيد
+            'name': userData['info']?['name'] ?? 'بدون اسم',
+            'status': 'waiting',
             'added_at': FieldValue.serverTimestamp(),
           });
         }
 
-        await batch.commit(); // تنفيذ الحفظ دفعة واحدة
+        await batch.commit();
       }
 
       if (mounted) Navigator.pop(context, true);
@@ -183,9 +193,7 @@ class _AddTripDialogState extends State<AddTripDialog> {
     }
   }
 
-  // 🌟 دالة الحذف الجديدة مع رسالة التأكيد
   Future<void> _deleteTrip() async {
-    // 1. إظهار رسالة تأكيد أولاً
     bool confirmDelete =
         await showDialog(
           context: context,
@@ -210,7 +218,7 @@ class _AddTripDialogState extends State<AddTripDialog> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false), // إلغاء
+                onPressed: () => Navigator.pop(context, false),
                 child: const Text(
                   'إلغاء',
                   style: TextStyle(color: Colors.white54),
@@ -220,7 +228,7 @@ class _AddTripDialogState extends State<AddTripDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                 ),
-                onPressed: () => Navigator.pop(context, true), // تأكيد
+                onPressed: () => Navigator.pop(context, true),
                 child: const Text(
                   'نعم، احذف',
                   style: TextStyle(
@@ -232,9 +240,8 @@ class _AddTripDialogState extends State<AddTripDialog> {
             ],
           ),
         ) ??
-        false; // إذا ضغط برا الشاشة يعتبره إلغاء
+        false;
 
-    // 2. إذا وافق على الحذف، نحذف من الداتابيس
     if (confirmDelete) {
       setState(() => isLoading = true);
       try {
@@ -242,7 +249,7 @@ class _AddTripDialogState extends State<AddTripDialog> {
             .collection('Trips')
             .doc(widget.tripId)
             .delete();
-        if (mounted) Navigator.pop(context, true); // إغلاق النافذة
+        if (mounted) Navigator.pop(context, true);
         _showMsg('تم حذف الرحلة بنجاح 🗑️');
       } catch (e) {
         _showMsg('حدث خطأ أثناء الحذف');
@@ -389,10 +396,8 @@ class _AddTripDialogState extends State<AddTripDialog> {
               ),
               const SizedBox(height: 30),
 
-              // 🌟 أزرار التحكم السفلية (تم التعديل هنا لدعم الحذف)
               Row(
                 children: [
-                  // زر الإضافة / التعديل (يأخذ المساحة الأكبر)
                   Expanded(
                     child: SizedBox(
                       height: 55,
@@ -421,13 +426,11 @@ class _AddTripDialogState extends State<AddTripDialog> {
                       ),
                     ),
                   ),
-
-                  // 🌟 زر الحذف يظهر فقط في حالة التعديل
                   if (isEdit) ...[
                     const SizedBox(width: 15),
                     SizedBox(
                       height: 55,
-                      width: 55, // زر مربع أنيق
+                      width: 55,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.redAccent.withOpacity(0.15),
@@ -459,7 +462,6 @@ class _AddTripDialogState extends State<AddTripDialog> {
     );
   }
 
-  // --- دوال القوائم (نفسها بدون تغيير) ---
   Widget _buildGroupDropdown() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('Groups').snapshots(),
