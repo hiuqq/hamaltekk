@@ -18,10 +18,21 @@ class _AddTripDialogState extends State<AddTripDialog> {
   String? selectedGroupId;
   String? selectedTemplateId;
   String? selectedBusId;
+  String? selectedDay; // 🌟 حقل جديد لتخزين يوم الرحلة (يخدم التقرير)
   DateTime? selectedDateTime;
   GeoPoint? busLocation;
   bool isLoading = false;
   bool isLocationFetched = false;
+
+  // 🌟 قائمة أيام الحج المربوطة بالتقرير
+  final List<Map<String, String>> hajjDays = [
+    {'key': 'day_8', 'title': 'يوم التروية (8 ذو الحجة)'},
+    {'key': 'day_9', 'title': 'يوم عرفة (9 ذو الحجة)'},
+    {'key': 'day_10', 'title': 'يوم النحر (10 ذو الحجة)'},
+    {'key': 'day_11', 'title': 'أول أيام التشريق (11 ذو الحجة)'},
+    {'key': 'day_12', 'title': 'ثاني أيام التشريق (12 ذو الحجة)'},
+    {'key': 'day_13', 'title': 'ثالث أيام التشريق (13 ذو الحجة)'},
+  ];
 
   @override
   void initState() {
@@ -30,10 +41,11 @@ class _AddTripDialogState extends State<AddTripDialog> {
       selectedGroupId = widget.initialData!['group_id'];
       selectedTemplateId = widget.initialData!['template_id'];
       selectedBusId = widget.initialData!['bus_id'];
+      selectedDay =
+          widget.initialData!['day']; // 🌟 استرجاع اليوم في حال التعديل
       selectedDateTime = (widget.initialData!['scheduled_at'] as Timestamp)
           .toDate();
 
-      // 🌟 التعديل الأول: التحقق إذا كانت الرحلة لها موقع مسبقاً عشان نحدث حالة الزر
       if (widget.initialData!['bus_lat'] != null &&
           widget.initialData!['bus_lng'] != null) {
         busLocation = GeoPoint(
@@ -117,9 +129,11 @@ class _AddTripDialogState extends State<AddTripDialog> {
   }
 
   Future<void> _saveTrip() async {
+    // 🌟 إضافة selectedDay لشرط التحقق
     if (selectedGroupId == null ||
         selectedTemplateId == null ||
         selectedBusId == null ||
+        selectedDay == null ||
         selectedDateTime == null) {
       _showMsg('الرجاء إكمال جميع البيانات');
       return;
@@ -132,17 +146,16 @@ class _AddTripDialogState extends State<AddTripDialog> {
           widget.tripId ?? '${selectedTemplateId}_$selectedGroupId';
       var firestore = FirebaseFirestore.instance;
 
-      // 1. إنشاء/تحديث معلومات الرحلة الأساسية
       Map<String, dynamic> data = {
         'template_id': selectedTemplateId,
         'group_id': selectedGroupId,
         'bus_id': selectedBusId,
+        'day': selectedDay, // 🌟 حفظ اليوم في الفايربيس
         'scheduled_at': Timestamp.fromDate(selectedDateTime!),
         'status': widget.initialData?['status'] ?? 'scheduled',
         'created_by': FirebaseAuth.instance.currentUser?.uid,
       };
 
-      // 🌟 التعديل الثاني: إضافة الإحداثيات للفايربيس كأرقام زي ما اتفقنا
       if (busLocation != null) {
         data['bus_lat'] = busLocation!.latitude;
         data['bus_lng'] = busLocation!.longitude;
@@ -153,11 +166,14 @@ class _AddTripDialogState extends State<AddTripDialog> {
           .doc(tripDocId)
           .set(data, SetOptions(merge: true));
 
-      // 2. إنشاء (Manifest) قائمة ركاب الرحلة تلقائياً!
       if (widget.tripId == null) {
         var usersSnapshot = await firestore
             .collection('Users')
             .where('group_id', isEqualTo: selectedGroupId)
+            .where(
+              'type',
+              isEqualTo: 'p',
+            ) // 🌟 هنا السحر! يسحب الحجاج (p) فقط ويتجاهل المشرف (s)
             .get();
 
         WriteBatch batch = firestore.batch();
@@ -176,7 +192,6 @@ class _AddTripDialogState extends State<AddTripDialog> {
             'added_at': FieldValue.serverTimestamp(),
           });
         }
-
         await batch.commit();
       }
 
@@ -316,6 +331,9 @@ class _AddTripDialogState extends State<AddTripDialog> {
               const SizedBox(height: 15),
 
               _buildTemplateDropdown(),
+              const SizedBox(height: 15),
+
+              _buildDayDropdown(), // 🌟 القائمة المنسدلة الجديدة الخاصة باليوم
               const SizedBox(height: 15),
 
               Row(
@@ -462,13 +480,38 @@ class _AddTripDialogState extends State<AddTripDialog> {
     );
   }
 
+  // 🌟 القائمة المنسدلة الجديدة ليوم الرحلة
+  Widget _buildDayDropdown() {
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: DropdownButtonFormField<String>(
+        value: selectedDay,
+        isExpanded: true,
+        dropdownColor: const Color(0xFF2D231E),
+        iconEnabledColor: const Color(0xFFA07B4F),
+        decoration: _inputDeco('اختر يوم الرحلة'),
+        items: hajjDays
+            .map(
+              (day) => DropdownMenuItem<String>(
+                value: day['key'],
+                child: Text(
+                  day['title']!,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: (val) => setState(() => selectedDay = val),
+      ),
+    );
+  }
+
   Widget _buildGroupDropdown() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('Groups').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData)
           return const LinearProgressIndicator(color: Color(0xFFA07B4F));
-
         var groups = snapshot.data!.docs;
         return Directionality(
           textDirection: ui.TextDirection.rtl,
@@ -504,7 +547,6 @@ class _AddTripDialogState extends State<AddTripDialog> {
       builder: (context, snapshot) {
         if (!snapshot.hasData)
           return const LinearProgressIndicator(color: Color(0xFFA07B4F));
-
         var templates = snapshot.data!.docs;
         return Directionality(
           textDirection: ui.TextDirection.rtl,
@@ -538,7 +580,6 @@ class _AddTripDialogState extends State<AddTripDialog> {
       builder: (context, snapshot) {
         if (!snapshot.hasData)
           return const LinearProgressIndicator(color: Color(0xFFA07B4F));
-
         var buses = snapshot.data!.docs;
         return Directionality(
           textDirection: ui.TextDirection.rtl,

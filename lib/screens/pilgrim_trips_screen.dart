@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:hamaltekk/screens/chat_screen.dart'; // 🌟 استدعاء شاشة المحادثة
 
 class PilgrimTripsScreen extends StatelessWidget {
   const PilgrimTripsScreen({super.key});
@@ -127,7 +128,12 @@ class PilgrimTripsScreen extends StatelessWidget {
                           itemBuilder: (context, index) {
                             var tripData =
                                 trips[index].data() as Map<String, dynamic>;
-                            return _buildPilgrimTripCard(context, tripData);
+                            // نمرر userId عشان نحتاجه في المحادثة
+                            return _buildPilgrimTripCard(
+                              context,
+                              tripData,
+                              userId ?? '',
+                            );
                           },
                         );
                       },
@@ -170,10 +176,14 @@ class PilgrimTripsScreen extends StatelessWidget {
   Widget _buildPilgrimTripCard(
     BuildContext context,
     Map<String, dynamic> tripData,
+    String currentPilgrimId, // 🌟 استقبلنا رقم الحاج هنا
   ) {
     Timestamp? scheduledAt = tripData['scheduled_at'];
     String timeString = "غير محدد";
     String dateString = "غير محدد";
+
+    // 🌟 سحبنا الـ UID الخاص بمشرف الرحلة
+    String supervisorId = tripData['created_by'] ?? '';
 
     if (scheduledAt != null) {
       DateTime dt = scheduledAt.toDate();
@@ -232,87 +242,191 @@ class PilgrimTripsScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      // 🌟 غلفنا المحتوى بـ Column عشان نضيف قسم المشرف تحت معلومات الرحلة
+      child: Column(
         children: [
-          // 🌟 زر الموقع التفاعلي
-          GestureDetector(
-            onTap: () => _openGoogleMaps(context, tripData),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'موقع الباص',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white24, width: 1),
-                  ),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const Spacer(),
-
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // زر الموقع التفاعلي
+              GestureDetector(
+                onTap: () => _openGoogleMaps(context, tripData),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'موقع الباص',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white24, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(),
+
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(height: 1.5, width: 70, color: Colors.white30),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'معلومات الرحلة',
-                    style: TextStyle(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(height: 1.5, width: 70, color: Colors.white30),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'معلومات الرحلة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+
+                  _buildTripDataRow(Icons.map_outlined, 'إلى : $destination'),
+                  _buildTripDataRow(
+                    Icons.calendar_month_outlined,
+                    'تاريخ الإنطلاق : $dateString',
+                  ),
+                  _buildTripDataRow(
+                    Icons.access_time,
+                    'موعد الإنطلاق : $timeString',
+                  ),
+                  _buildTripDataRow(
+                    Icons.directions_bus_outlined,
+                    'رقم الباص : $busId',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    statusText,
+                    style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 15),
-
-              _buildTripDataRow(Icons.map_outlined, 'إلى : $destination'),
-              _buildTripDataRow(
-                Icons.calendar_month_outlined,
-                'تاريخ الإنطلاق : $dateString',
-              ),
-              _buildTripDataRow(
-                Icons.access_time,
-                'موعد الإنطلاق : $timeString',
-              ),
-              _buildTripDataRow(
-                Icons.directions_bus_outlined,
-                'رقم الباص : $busId',
-              ),
-
-              const SizedBox(height: 12),
-
-              Text(
-                statusText,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ],
           ),
+
+          // 🌟 إضافة قسم مشرف الرحلة والمحادثة (إذا كان المشرف موجود)
+          if (supervisorId.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Container(
+              height: 1,
+              width: double.infinity,
+              color: Colors.white.withOpacity(0.1), // فاصل خفيف أنيق
+            ),
+            const SizedBox(height: 15),
+            _buildSupervisorInfo(context, supervisorId, currentPilgrimId),
+          ],
         ],
       ),
+    );
+  }
+
+  // 🌟 دالة جديدة لعرض بيانات المشرف مع أيقونة المحادثة
+  Widget _buildSupervisorInfo(
+    BuildContext context,
+    String supervisorId,
+    String currentPilgrimId,
+  ) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('Users')
+          .doc(supervisorId)
+          .get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        var data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+        String name = data['info']?['name'] ?? 'مشرف الرحلة';
+
+        return Row(
+          children: [
+            // أيقونة المحادثة (يسار)
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFA07B4F).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.chat_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: () {
+                  // 🌟 تكوين المعرف المشترك للمحادثة (بنفس ترتيب شاشة المشرف: المشرف_الحاج)
+                  String chatId = '${supervisorId}_$currentPilgrimId';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        chatId: chatId,
+                        otherUserName: name, // اسم المشرف
+                        currentUserId: currentPilgrimId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const Spacer(),
+
+            // بيانات واسم المشرف (يمين)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'مشرف الباص',
+                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_outline,
+                color: Colors.white70,
+                size: 20,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -330,16 +444,13 @@ class PilgrimTripsScreen extends StatelessWidget {
     );
   }
 
-  // 🌟 الدالة السحرية النهائية: تقرأ الموقع من الرحلة نفسها وتفتح الخريطة بدبوس أحمر!
   Future<void> _openGoogleMaps(
     BuildContext context,
     Map<String, dynamic> tripData,
   ) async {
-    // 1. نقرأ الإحداثيات من نفس الرحلة اللي حددها المشرف
     double? lat = tripData['bus_lat'];
     double? lng = tripData['bus_lng'];
 
-    // 2. إذا مافيه إحداثيات (المشرف ما أضاف موقع)
     if (lat == null || lng == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -353,7 +464,6 @@ class PilgrimTripsScreen extends StatelessWidget {
     }
 
     try {
-      // 3. رابط قوقل ماب العالمي مع وضع دبوس (Pin) على الموقع الدقيق
       final String googleMapsUrl =
           'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
       final Uri url = Uri.parse(googleMapsUrl);

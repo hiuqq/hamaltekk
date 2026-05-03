@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hamaltekk/screens/pilgrims_list_screen.dart';
+import 'package:hamaltekk/widgets/add_meal_dialog.dart';
+import 'package:hamaltekk/screens/daily_reports_list_screen.dart';
+import 'package:hamaltekk/screens/staff_requests_screen.dart'; // 🌟 استيراد شاشة الطلبات الجديدة
 
 class StaffHomeScreen extends StatefulWidget {
   const StaffHomeScreen({super.key});
@@ -28,8 +31,6 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-
-      // شلنا البار السفلي من هنا لأنه صار في الشاشة الأم
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('Users')
@@ -225,16 +226,48 @@ class _StaffHomeScreenState extends State<StaffHomeScreen> {
                       },
                     ),
                     const SizedBox(height: 15),
+
                     _buildServiceButton(
                       'إشعار تسليم الوجبة',
                       Icons.restaurant_menu_outlined,
-                      () {},
+                      () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return const AddMealDialog();
+                          },
+                        );
+                      },
                     ),
+
                     const SizedBox(height: 15),
                     _buildServiceButton(
                       'التقارير اليومية',
                       Icons.insert_drive_file_outlined,
-                      () {},
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const DailyReportsListScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 15),
+                    // 🌟 إضافة زر صندوق طلبات الحجاج الجديد
+                    _buildServiceButton(
+                      'صندوق طلبات الحجاج',
+                      Icons.mark_as_unread_outlined,
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const StaffRequestsScreen(),
+                          ),
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 100), // مساحة عشان الشريط السفلي

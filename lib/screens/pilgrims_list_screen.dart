@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hamaltekk/widgets/hajj_info_overlays.dart';
+import 'package:hamaltekk/screens/chat_screen.dart';
 
 class PilgrimsListScreen extends StatefulWidget {
   const PilgrimsListScreen({super.key});
@@ -45,7 +46,6 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                 children: [
                   _buildCustomAppBar(context),
 
-                  // عرض العدد
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -73,7 +73,6 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                     ),
                   ),
 
-                  // حقل البحث
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: TextField(
@@ -108,7 +107,6 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // القائمة الفعلية للحجاج مع البحث
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
@@ -121,7 +119,6 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
 
                         var docs = pilgrimsSnapshot.data!.docs;
 
-                        // تصفية القائمة بناءً على البحث
                         if (searchQuery.isNotEmpty) {
                           docs = docs.where((doc) {
                             String name =
@@ -150,10 +147,10 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                           itemBuilder: (context, index) {
                             var pilgrimData =
                                 docs[index].data() as Map<String, dynamic>;
+                            String pilgrimId = docs[index].id;
                             String name =
                                 pilgrimData['info']?['name'] ?? 'حاج بدون اسم';
 
-                            // 🌟 التعديل: سحب الأمراض وتصفيتها من أي نصوص فارغة أو مسافات
                             List rawDiseases =
                                 pilgrimData['info']?['dis'] ?? [];
                             List cleanDiseases = rawDiseases
@@ -163,7 +160,6 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                                 )
                                 .toList();
 
-                            // إذا بعد التنظيف صارت المصفوفة فيها أمراض حقيقية، خله أحمر
                             bool isCritical = cleanDiseases.isNotEmpty;
 
                             return _buildPilgrimCard(
@@ -171,6 +167,7 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
                               name,
                               isCritical,
                               pilgrimData,
+                              pilgrimId,
                             );
                           },
                         );
@@ -219,6 +216,7 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
     String name,
     bool isCritical,
     Map<String, dynamic> pilgrimData,
+    String pilgrimId,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -240,39 +238,72 @@ class _PilgrimsListScreenState extends State<PilgrimsListScreen> {
         ),
         border: Border.all(color: Colors.white10, width: 0.5),
       ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(
-              Icons.medical_services_outlined,
-              color: isCritical ? Colors.redAccent : Colors.white70,
-              size: 22,
-            ),
-            onPressed: () =>
-                HajjInfoOverlays.showHealthCard(context, pilgrimData),
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.info_outline,
-              color: Colors.white70,
-              size: 22,
-            ),
-            onPressed: () =>
-                HajjInfoOverlays.showInfoCard(context, pilgrimData),
-          ),
-          const Spacer(),
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+      // 🌟 الترتيب الجديد والموحد من اليمين لليسار
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Row(
+          children: [
+            // 1. الاسم يمين
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
-          ),
-        ],
+            // 2. معلومات شخصية
+            IconButton(
+              icon: const Icon(
+                Icons.info_outline,
+                color: Colors.white70,
+                size: 22,
+              ),
+              onPressed: () =>
+                  HajjInfoOverlays.showInfoCard(context, pilgrimData),
+            ),
+            // 3. معلومات صحية
+            IconButton(
+              icon: Icon(
+                Icons.medical_services_outlined,
+                color: isCritical ? Colors.redAccent : Colors.white70,
+                size: 22,
+              ),
+              onPressed: () =>
+                  HajjInfoOverlays.showHealthCard(context, pilgrimData),
+            ),
+            // 4. رسائل يسار
+            IconButton(
+              icon: const Icon(
+                Icons.chat_outlined,
+                color: Colors.white70,
+                size: 22,
+              ),
+              onPressed: () {
+                String currentUserId =
+                    FirebaseAuth.instance.currentUser?.uid ?? '';
+                String chatId = '${currentUserId}_$pilgrimId';
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      chatId: chatId,
+                      otherUserName: name,
+                      currentUserId: currentUserId,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

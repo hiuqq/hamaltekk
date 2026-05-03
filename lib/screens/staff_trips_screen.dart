@@ -168,16 +168,25 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
     );
   }
 
-  // 🌟 الدالة المعدلة: تحدث الحالة وتستدعي دالة الأتمتة
+  // 🌟 الدالة المعدلة: تحفظ حالة الرحلة مع تسجيل وقت البداية والنهاية للتقرير
   Future<void> _updateTripStatus(String newStatus) async {
     try {
-      // 1. تحديث حالة الرحلة في قاعدة البيانات
+      Map<String, dynamic> updateData = {'status': newStatus};
+
+      // 🌟 تسجيل أوقات التصعيد (Start/End time) في الفايربيس بمجرد تغيير الحالة
+      if (newStatus == 'active') {
+        updateData['start_time'] = FieldValue.serverTimestamp();
+      } else if (newStatus == 'completed') {
+        updateData['end_time'] = FieldValue.serverTimestamp();
+      }
+
+      // 1. التحديث في قاعدة البيانات
       await FirebaseFirestore.instance
           .collection('Trips')
           .doc(widget.tripId)
-          .update({'status': newStatus});
+          .update(updateData);
 
-      // 🌟 2. تشغيل الأتمتة: إرسال الرسائل للكل تلقائياً
+      // 2. تشغيل الأتمتة
       await _sendAutomatedSystemMessage(newStatus);
 
       _showCustomSnackBar(
@@ -189,7 +198,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
     }
   }
 
-  // 🌟 دالة الأتمتة: تقرأ المانيفست وترسل رسالة للجميع في جزء من الثانية
   Future<void> _sendAutomatedSystemMessage(String newStatus) async {
     final String? supervisorId = FirebaseAuth.instance.currentUser?.uid;
     if (supervisorId == null) return;
@@ -197,18 +205,16 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
     final firestore = FirebaseFirestore.instance;
     String messageText = '';
 
-    // نحدد نص الرسالة بناءً على الحالة الجديدة
     if (newStatus == 'active') {
       messageText =
           '🚌 إشعار نظام: بدأت الرحلة الآن، نرجو التوجه للحافلة فوراً.';
     } else if (newStatus == 'completed') {
       messageText = '✅ إشعار نظام: انتهت الرحلة بسلام، تقبل الله طاعتكم.';
     } else {
-      return; // لو الحالة 'scheduled' ما نرسل شيء للمحادثة
+      return;
     }
 
     try {
-      // نجيب قائمة الحجاج اللي في هذي الرحلة بس من (manifest)
       var manifestSnapshot = await firestore
           .collection('Trips')
           .doc(widget.tripId)
@@ -217,12 +223,11 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
 
       if (manifestSnapshot.docs.isEmpty) return;
 
-      // نفتح Batch عشان نرسل كل الرسايل كدفعة وحدة بدون ما يعلق التطبيق
       WriteBatch batch = firestore.batch();
 
       for (var doc in manifestSnapshot.docs) {
         String pilgrimId = doc.id;
-        String chatId = '${supervisorId}_$pilgrimId'; // الغرفة المشتركة بينهم
+        String chatId = '${supervisorId}_$pilgrimId';
 
         var messageRef = firestore
             .collection('Chats')
@@ -230,15 +235,13 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
             .collection('messages')
             .doc();
 
-        // إضافة الرسالة
         batch.set(messageRef, {
           'text': messageText,
-          'sender_id': supervisorId, // كأن المشرف هو اللي أرسلها
+          'sender_id': supervisorId,
           'timestamp': FieldValue.serverTimestamp(),
-          'type': 'system_alert', // بتطلع باللون الذهبي المميز اللي صممناه
+          'type': 'system_alert',
         });
 
-        // تحديث الشاشة الخارجية لقائمة المحادثات عشان تظهر آخر رسالة
         var chatRef = firestore.collection('Chats').doc(chatId);
         batch.set(chatRef, {
           'last_message': messageText,
@@ -246,11 +249,8 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
         }, SetOptions(merge: true));
       }
 
-      // إرسال الدفعة بالكامل
       await batch.commit();
-      print(
-        '🚀 تم إرسال رسائل النظام الأوتوماتيكية بنجاح لعدد ${manifestSnapshot.docs.length} حاج',
-      );
+      print('🚀 تم إرسال رسائل النظام الأوتوماتيكية بنجاح');
     } catch (e) {
       print('🚨 حدث خطأ في الأتمتة: $e');
     }
@@ -334,7 +334,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                       style: TextStyle(color: Colors.white54, fontSize: 11),
                     ),
                     const SizedBox(height: 5),
-
                     GestureDetector(
                       onTap: () async {
                         String busId = widget.tripData['bus_id'];
@@ -428,7 +427,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                         widget.tripData['bus_id'] ?? '-',
                       ),
                       const SizedBox(height: 8),
-
                       if (!isExpanded)
                         _buildDetailRow(
                           'حالة التصعيد',

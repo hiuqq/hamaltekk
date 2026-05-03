@@ -1,8 +1,14 @@
+import 'dart:math';
+import 'dart:convert'; // 🌟 مكتبة تحويل البيانات (إضافة صديقتك)
+import 'package:http/http.dart'
+    as http; // 🌟 مكتبة إرسال الطلبات للنت (إضافة صديقتك)
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart'; // 🌟 ضروري للإشعارات
 import 'package:hamaltekk/screens/login_screen.dart';
+import 'package:hamaltekk/screens/otp_screen.dart'; // 🌟 استدعاء شاشة الـ OTP (إضافة صديقتك)
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -17,6 +23,40 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
 
+  // ==========================================
+  // 🌟 دالة إرسال الإيميل (إضافة صديقتك)
+  // ==========================================
+  Future<void> sendOtpEmail(String userEmail, String otpCode) async {
+    const serviceId = 'service_i8k6fwl';
+    const templateId = 'template_t5ts9eo';
+    const publicKey = 'v9Ve5x9gWZ-XEo--8';
+    const privateKey = 'pC3ojTtbkFvnmSfV1zN-F';
+
+    final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'service_id': serviceId,
+          'template_id': templateId,
+          'user_id': publicKey,
+          'accessToken': privateKey,
+          'template_params': {'email': userEmail, 'passcode': otpCode},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ تم إرسال الإيميل بنجاح');
+      } else {
+        print('❌ فشل الإرسال: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ خطأ في الاتصال بـ EmailJS: $e');
+    }
+  }
+
   Future<void> _handleSignUp() async {
     final refNo = idController.text.trim();
     final email = emailController.text.trim();
@@ -30,7 +70,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
-      // 1. 🔔 جلب رمز الإشعارات (FCM Token)
+      // 1. 🔔 جلب رمز الإشعارات (FCM Token) - شغلك الأساسي
       String? fcmToken;
       try {
         fcmToken = await FirebaseMessaging.instance.getToken();
@@ -38,7 +78,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         print("⚠️ تنبيه: فشل جلب التوكن (تأكد من إعدادات Firebase Messaging)");
       }
 
-      // 2. التحقق من كولكشن الحجاج (Nusk)
+      // 2. التحقق من كولكشن الحجاج (Nusk) - شغلك الأساسي
       var nuskDoc = await FirebaseFirestore.instance
           .collection('Nusk')
           .doc(refNo)
@@ -52,7 +92,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         userType = 'p'; // حاج
         infoData = nuskDoc.data()!;
       } else {
-        // 3. التحقق من كولكشن المشرفين (Staff)
+        // 3. التحقق من كولكشن المشرفين (Staff) - شغلك الأساسي
         var staffDoc = await FirebaseFirestore.instance
             .collection('Staff')
             .doc(refNo)
@@ -85,17 +125,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
 
-      // 4. إنشاء الحساب في Firebase Auth
+      // 4. إنشاء الحساب في Firebase Auth - شغلك الأساسي
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
       String uid = userCredential.user!.uid;
 
-      // 5. 🔍 خوارزمية التعيين التلقائي للجروبات
+      // 5. 🔍 خوارزمية التعيين التلقائي للجروبات - شغلك الأساسي
       String? assignedGroupId;
 
       if (userType == 'p') {
-        // للحاج: تعيين تلقائي بناءً على السعة
         var groupsSnapshot = await FirebaseFirestore.instance
             .collection('Groups')
             .get();
@@ -110,7 +149,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
           }
         }
       } else if (userType == 's') {
-        // 🛠️ للمشرف: البحث عن المجموعة باستخدام حقل sup_id
         var groupQuery = await FirebaseFirestore.instance
             .collection('Groups')
             .where('sup_id', isEqualTo: refNo)
@@ -123,7 +161,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
 
-      // 6. حفظ البيانات النهائية في كولكشن (Users)
+      // 6. حفظ البيانات النهائية في كولكشن (Users) - شغلك الأساسي
       if (userType == 's') {
         infoData['active_hajj_tasks'] = activeHajjTasks;
       }
@@ -135,19 +173,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'refNo': refNo,
         'info': infoData,
         'group_id': assignedGroupId,
-        'fcm_token': fcmToken, // 🌟 حفظ التوكن للإشعارات
+        'fcm_token': fcmToken,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 7. 🚪 تسجيل خروج وتحويل لشاشة تسجيل الدخول
-      await FirebaseAuth.instance.signOut();
+      // ==========================================
+      // 7. 🚪 توليد وإرسال رمز التحقق والانتقال (إضافة صديقتك)
+      // ==========================================
+
+      // توليد رقم عشوائي من 4 خانات
+      String generatedOtp = (Random().nextInt(9000) + 1000).toString();
+
+      // إرسال الإيميل في الخلفية
+      await sendOtpEmail(email, generatedOtp);
 
       if (mounted) {
-        _showSnackBar('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول 🔑');
-        Navigator.pushAndRemoveUntil(
+        _showSnackBar('تم إرسال رمز التحقق إلى بريدك الإلكتروني 📩');
+
+        Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
+          MaterialPageRoute(
+            builder: (context) => OtpScreen(
+              actualOtp: generatedOtp,
+              userType: userType,
+              email: email,
+            ),
+          ),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -180,6 +231,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // ==========================================
+  // تصميم واجهة المستخدم (UI) - شغلك الأساسي وماتغير فيه ولا حرف 🌟
+  // ==========================================
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;

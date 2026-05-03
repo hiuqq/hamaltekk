@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hamaltekk/widgets/hajj_info_overlays.dart'; // 🌟 استدعاء الكلاس حقك
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hamaltekk/widgets/hajj_info_overlays.dart';
+import 'package:hamaltekk/screens/chat_screen.dart';
 
 class PilgrimsBoardingScreen extends StatelessWidget {
   final String tripId;
@@ -9,6 +11,8 @@ class PilgrimsBoardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -23,13 +27,11 @@ class PilgrimsBoardingScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // الخلفية الفخمة
           Positioned.fill(
             child: Image.asset('assets/black.png', fit: BoxFit.cover),
           ),
 
           StreamBuilder<QuerySnapshot>(
-            // 🌟 نقرأ من قائمة ركاب الرحلة الحالية
             stream: FirebaseFirestore.instance
                 .collection('Trips')
                 .doc(tripId)
@@ -50,9 +52,20 @@ class PilgrimsBoardingScreen extends StatelessWidget {
                 );
               }
 
-              var allPilgrims = snapshot.data!.docs;
+              // فلترة: استبعاد المشرف نفسه
+              var allPilgrims = snapshot.data!.docs
+                  .where((doc) => doc.id != currentUserId)
+                  .toList();
 
-              // تقسيمهم حسب حالة التصعيد
+              if (allPilgrims.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'لا يوجد حجاج مسجلين في هذا الباص',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                );
+              }
+
               var boarded = allPilgrims
                   .where(
                     (p) =>
@@ -87,7 +100,6 @@ class PilgrimsBoardingScreen extends StatelessWidget {
                             const Color(0xFFE53935),
                           ),
                           const SizedBox(height: 10),
-                          // 🌟 استدعاء الكرت الموحد للحجاج في الانتظار
                           ...waiting.map(
                             (doc) => UnifiedPilgrimCard(pilgrimId: doc.id),
                           ),
@@ -100,7 +112,6 @@ class PilgrimsBoardingScreen extends StatelessWidget {
                             const Color(0xFF4CAF50),
                           ),
                           const SizedBox(height: 10),
-                          // 🌟 استدعاء الكرت الموحد للحجاج اللي تم تصعيدهم
                           ...boarded.map(
                             (doc) => UnifiedPilgrimCard(pilgrimId: doc.id),
                           ),
@@ -117,7 +128,6 @@ class PilgrimsBoardingScreen extends StatelessWidget {
     );
   }
 
-  // --- العدادات العلوية ---
   Widget _buildTopStats(int boarded, int waiting) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -202,12 +212,6 @@ class PilgrimsBoardingScreen extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// 🌟 الكرت الموحد (نسخة طبق الأصل من تصميمك)
-// ============================================================================
-// ============================================================================
-// 🌟 الكرت الموحد (تم تعديل الترتيب: الاسم يمين والأيقونات يسار)
-// ============================================================================
 class UnifiedPilgrimCard extends StatelessWidget {
   final String pilgrimId;
 
@@ -252,47 +256,72 @@ class UnifiedPilgrimCard extends StatelessWidget {
             ),
             border: Border.all(color: Colors.white10, width: 0.5),
           ),
-          child: Row(
-            children: [
-              // 1. اسم الحاج (صار في البداية عشان يجي يمين)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 5),
-                  child: Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+          // 🌟 الترتيب الجديد والموحد من اليمين لليسار
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Row(
+              children: [
+                // 1. الاسم يمين
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1, // عشان لو الاسم طويل ما ينزل سطر ثاني
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-
-              // 2. أيقونة المعلومات الشخصية
-              IconButton(
-                icon: const Icon(
-                  Icons.info_outline,
-                  color: Colors.white70,
-                  size: 22,
+                // 2. معلومات شخصية
+                IconButton(
+                  icon: const Icon(
+                    Icons.info_outline,
+                    color: Colors.white70,
+                    size: 22,
+                  ),
+                  onPressed: () =>
+                      HajjInfoOverlays.showInfoCard(context, pilgrimData),
                 ),
-                onPressed: () =>
-                    HajjInfoOverlays.showInfoCard(context, pilgrimData),
-              ),
-
-              // 3. أيقونة المعلومات الطبية (صارت في الأخير عشان تجي يسار)
-              IconButton(
-                icon: Icon(
-                  Icons.medical_services_outlined,
-                  color: isCritical ? Colors.redAccent : Colors.white70,
-                  size: 22,
+                // 3. معلومات صحية
+                IconButton(
+                  icon: Icon(
+                    Icons.medical_services_outlined,
+                    color: isCritical ? Colors.redAccent : Colors.white70,
+                    size: 22,
+                  ),
+                  onPressed: () =>
+                      HajjInfoOverlays.showHealthCard(context, pilgrimData),
                 ),
-                onPressed: () =>
-                    HajjInfoOverlays.showHealthCard(context, pilgrimData),
-              ),
-            ],
+                // 4. رسائل يسار
+                IconButton(
+                  icon: const Icon(
+                    Icons.chat_outlined,
+                    color: Colors.white70,
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    String currentUserId =
+                        FirebaseAuth.instance.currentUser?.uid ?? '';
+                    String chatId = '${currentUserId}_$pilgrimId';
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          chatId: chatId,
+                          otherUserName: name,
+                          currentUserId: currentUserId,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },

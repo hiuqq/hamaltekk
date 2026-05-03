@@ -67,7 +67,9 @@ class MyApp extends StatelessWidget {
         '/logo': (context) => const LogoScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
-        '/otp': (context) => const OtpScreen(),
+
+        // 🌟 تم إزالة مسار '/otp' من هنا؛ لأن شاشة التحقق تحتاج بيانات ديناميكية (كود التحقق والإيميل)
+        // وتمت معالجة الانتقال لها برمجياً من داخل شاشة التسجيل
       },
     );
   }
