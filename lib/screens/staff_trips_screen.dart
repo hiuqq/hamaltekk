@@ -62,7 +62,6 @@ class _StaffTripsScreenState extends State<StaffTripsScreen> {
                   ],
                 ),
               ),
-
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -70,19 +69,16 @@ class _StaffTripsScreenState extends State<StaffTripsScreen> {
                       .orderBy('scheduled_at', descending: false)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    if (snapshot.connectionState == ConnectionState.waiting)
                       return const Center(
                         child: CircularProgressIndicator(
                           color: Color(0xFFA07B4F),
                         ),
                       );
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
                       return _buildEmptyState();
-                    }
 
                     var trips = snapshot.data!.docs;
-
                     return ListView.builder(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -90,11 +86,9 @@ class _StaffTripsScreenState extends State<StaffTripsScreen> {
                       ),
                       itemCount: trips.length,
                       itemBuilder: (context, index) {
-                        var doc = trips[index];
-                        var tripData = doc.data() as Map<String, dynamic>;
                         return ExpandableTripCard(
-                          tripId: doc.id,
-                          tripData: tripData,
+                          tripId: trips[index].id,
+                          tripData: trips[index].data() as Map<String, dynamic>,
                         );
                       },
                     );
@@ -133,13 +127,11 @@ class _StaffTripsScreenState extends State<StaffTripsScreen> {
 class ExpandableTripCard extends StatefulWidget {
   final String tripId;
   final Map<String, dynamic> tripData;
-
   const ExpandableTripCard({
     super.key,
     required this.tripId,
     required this.tripData,
   });
-
   @override
   State<ExpandableTripCard> createState() => _ExpandableTripCardState();
 }
@@ -168,27 +160,27 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
     );
   }
 
-  // 🌟 الدالة المعدلة: تحفظ حالة الرحلة مع تسجيل وقت البداية والنهاية للتقرير
   Future<void> _updateTripStatus(String newStatus) async {
     try {
       Map<String, dynamic> updateData = {'status': newStatus};
-
-      // 🌟 تسجيل أوقات التصعيد (Start/End time) في الفايربيس بمجرد تغيير الحالة
       if (newStatus == 'active') {
         updateData['start_time'] = FieldValue.serverTimestamp();
       } else if (newStatus == 'completed') {
         updateData['end_time'] = FieldValue.serverTimestamp();
+        // 🌟 فك حجز الباص عند انتهاء الرحلة ليعود متاحاً
+        if (widget.tripData['bus_id'] != null) {
+          await FirebaseFirestore.instance
+              .collection('Buses')
+              .doc(widget.tripData['bus_id'])
+              .update({'status': ''});
+        }
       }
 
-      // 1. التحديث في قاعدة البيانات
       await FirebaseFirestore.instance
           .collection('Trips')
           .doc(widget.tripId)
           .update(updateData);
-
-      // 2. تشغيل الأتمتة
       await _sendAutomatedSystemMessage(newStatus);
-
       _showCustomSnackBar(
         'تم تحديث الحالة وإرسال الإشعارات بنجاح ✅',
         Colors.green,
@@ -201,18 +193,16 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
   Future<void> _sendAutomatedSystemMessage(String newStatus) async {
     final String? supervisorId = FirebaseAuth.instance.currentUser?.uid;
     if (supervisorId == null) return;
-
     final firestore = FirebaseFirestore.instance;
     String messageText = '';
 
-    if (newStatus == 'active') {
+    if (newStatus == 'active')
       messageText =
           '🚌 إشعار نظام: بدأت الرحلة الآن، نرجو التوجه للحافلة فوراً.';
-    } else if (newStatus == 'completed') {
+    else if (newStatus == 'completed')
       messageText = '✅ إشعار نظام: انتهت الرحلة بسلام، تقبل الله طاعتكم.';
-    } else {
+    else
       return;
-    }
 
     try {
       var manifestSnapshot = await firestore
@@ -220,37 +210,30 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
           .doc(widget.tripId)
           .collection('manifest')
           .get();
-
       if (manifestSnapshot.docs.isEmpty) return;
 
       WriteBatch batch = firestore.batch();
-
       for (var doc in manifestSnapshot.docs) {
-        String pilgrimId = doc.id;
-        String chatId = '${supervisorId}_$pilgrimId';
-
-        var messageRef = firestore
-            .collection('Chats')
-            .doc(chatId)
-            .collection('messages')
-            .doc();
-
-        batch.set(messageRef, {
-          'text': messageText,
-          'sender_id': supervisorId,
-          'timestamp': FieldValue.serverTimestamp(),
-          'type': 'system_alert',
-        });
-
-        var chatRef = firestore.collection('Chats').doc(chatId);
-        batch.set(chatRef, {
+        String chatId = '${supervisorId}_${doc.id}';
+        batch.set(
+          firestore
+              .collection('Chats')
+              .doc(chatId)
+              .collection('messages')
+              .doc(),
+          {
+            'text': messageText,
+            'sender_id': supervisorId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': 'system_alert',
+          },
+        );
+        batch.set(firestore.collection('Chats').doc(chatId), {
           'last_message': messageText,
           'last_time': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
-
       await batch.commit();
-      print('🚀 تم إرسال رسائل النظام الأوتوماتيكية بنجاح');
     } catch (e) {
       print('🚨 حدث خطأ في الأتمتة: $e');
     }
@@ -259,9 +242,7 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
   @override
   Widget build(BuildContext context) {
     Timestamp? scheduledAt = widget.tripData['scheduled_at'];
-    String timeString = "غير محدد";
-    String dateString = "غير محدد";
-
+    String timeString = "غير محدد", dateString = "غير محدد";
     if (scheduledAt != null) {
       DateTime dt = scheduledAt.toDate();
       timeString = DateFormat('hh:mm a').format(dt);
@@ -274,16 +255,15 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
         : currentStatus == 'active'
         ? 'يتم التصعيد'
         : 'انتهى التصعيد';
-    String destinationName = widget.tripData['template_id'] == 'mina_to_arafat'
-        ? 'التفويج إلى عرفة'
-        : widget.tripData['template_id'];
+
+    // 🌟 إظهار الوجهة المخصصة إذا كانت أخرى
+    String templateId = widget.tripData['template_id'] ?? '';
+    String destinationName = templateId == 'other'
+        ? (widget.tripData['custom_destination'] ?? 'وجهة مخصصة')
+        : (templateId == 'mina_to_arafat' ? 'التفويج إلى عرفة' : templateId);
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          isExpanded = !isExpanded;
-        });
-      },
+      onTap: () => setState(() => isExpanded = !isExpanded),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -322,7 +302,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
               ),
             ),
             const Divider(color: Colors.white24, height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,30 +315,27 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                     const SizedBox(height: 5),
                     GestureDetector(
                       onTap: () async {
-                        String busId = widget.tripData['bus_id'];
                         var busDoc = await FirebaseFirestore.instance
                             .collection('Buses')
-                            .doc(busId)
+                            .doc(widget.tripData['bus_id'])
                             .get();
-
                         if (busDoc.exists &&
                             busDoc.data()!.containsKey('location')) {
                           GeoPoint loc = busDoc['location'];
-                          final Uri url = Uri.parse(
-                            'https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}',
-                          );
-                          if (!await launchUrl(url)) {
+                          if (!await launchUrl(
+                            Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}',
+                            ),
+                          ))
                             _showCustomSnackBar(
                               'لا يمكن فتح تطبيق الخرائط',
                               Colors.red,
                             );
-                          }
-                        } else {
+                        } else
                           _showCustomSnackBar(
                             'موقع الباص غير متوفر حالياً',
                             Colors.orange,
                           );
-                        }
                       },
                       child: const Icon(
                         Icons.location_on,
@@ -367,7 +343,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                         size: 28,
                       ),
                     ),
-
                     if (isExpanded) ...[
                       const SizedBox(height: 15),
                       IconButton(
@@ -378,15 +353,13 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                           color: Colors.white,
                           size: 26,
                         ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ScannerScreen(tripId: widget.tripId),
-                            ),
-                          );
-                        },
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                ScannerScreen(tripId: widget.tripId),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 15),
                       IconButton(
@@ -397,20 +370,17 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                           color: Colors.white,
                           size: 26,
                         ),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AddTripDialog(
-                              tripId: widget.tripId,
-                              initialData: widget.tripData,
-                            ),
-                          );
-                        },
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (context) => AddTripDialog(
+                            tripId: widget.tripId,
+                            initialData: widget.tripData,
+                          ),
+                        ),
                       ),
                     ],
                   ],
                 ),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -438,12 +408,10 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                 ),
               ],
             ),
-
             if (isExpanded) ...[
               const SizedBox(height: 5),
               const Divider(color: Colors.white24, height: 1),
               const SizedBox(height: 10),
-
               const Text(
                 'حالة التصعيد :',
                 style: TextStyle(
@@ -453,7 +421,6 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                 ),
               ),
               const SizedBox(height: 5),
-
               Directionality(
                 textDirection: TextDirection.rtl,
                 child: Column(
@@ -476,9 +443,7 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 15),
-
               SizedBox(
                 width: double.infinity,
                 height: 40,
@@ -493,15 +458,13 @@ class _ExpandableTripCardState extends State<ExpandableTripCard> {
                       ),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            PilgrimsBoardingScreen(tripId: widget.tripId),
-                      ),
-                    );
-                  },
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          PilgrimsBoardingScreen(tripId: widget.tripId),
+                    ),
+                  ),
                   child: const Text(
                     'معلومات تصعيد الحجاج',
                     style: TextStyle(

@@ -36,7 +36,7 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
 
     if (groupId == null) return {};
 
-    // 1. حساب مهام اليوم[cite: 2]
+    // 1. حساب مهام اليوم
     double completionRate = 0.0;
     List<Map<String, dynamic>> todayTasks = [];
     var tasksList = info['active_hajj_tasks']?[widget.dayKey];
@@ -64,7 +64,7 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
         .get();
     int totalPilgrims = pilgrimsQuery.docs.length;
 
-    // 3. تحليل رحلات النقل (لهذا اليوم فقط) ومؤشر الاستجابة[cite: 2]
+    // 3. تحليل رحلات النقل (لهذا اليوم فقط) ومؤشر الاستجابة
     var tripsQuery = await FirebaseFirestore.instance
         .collection('Trips')
         .where('group_id', isEqualTo: groupId)
@@ -135,7 +135,7 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
         ? (totalResponseGapMinutes / validGapsCount).round()
         : 0;
 
-    // 4. جلب إشعارات الإعاشة[cite: 2]
+    // 4. جلب إشعارات الإعاشة
     var mealsQuery = await FirebaseFirestore.instance
         .collection('Meal_Notifications')
         .where('supervisor_id', isEqualTo: uid)
@@ -150,7 +150,7 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
         ? 'لا يوجد وجبات'
         : providedMealsList.join('، ');
 
-    // 🌟 5. جلب إحصائيات بلاغات الحجاج (جديد)[cite: 2]
+    // 🌟 5. الإحصائيات المحدثة لبلاغات الحجاج (المنطق الجديد) 🌟
     var requestsQuery = await FirebaseFirestore.instance
         .collection('SupportRequests')
         .where('group_id', isEqualTo: groupId)
@@ -158,9 +158,15 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
         .get();
 
     int totalRequests = requestsQuery.docs.length;
+    int newRequests = requestsQuery.docs
+        .where((doc) => doc['status'] == 'new')
+        .length; // الجديدة اللي مارد عليها المشرف
+    int pendingRequests = requestsQuery.docs
+        .where((doc) => doc['status'] == 'pending')
+        .length; // المؤجلة
     int resolvedRequests = requestsQuery.docs
         .where((doc) => doc['status'] == 'resolved')
-        .length;
+        .length; // المحلولة
 
     return {
       'taskCompletion': completionRate,
@@ -173,10 +179,11 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
       'avgResponseGap': avgResponseGap,
       'mealsCount': mealsCount,
       'providedMealsText': providedMealsText,
-      // قيم البلاغات الجديدة 🌟
+      // الداتا المحدثة 🌟
       'totalRequests': totalRequests,
+      'newRequests': newRequests,
+      'pendingRequests': pendingRequests,
       'resolvedRequests': resolvedRequests,
-      'pendingRequests': totalRequests - resolvedRequests,
     };
   }
 
@@ -274,7 +281,7 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
                     ),
                     const SizedBox(height: 25),
 
-                    // 🌟 4. كارد إحصائيات بلاغات الحجاج الجديد[cite: 2]
+                    // 🌟 4. كارد إحصائيات بلاغات الحجاج المُحدث 🌟
                     _buildRequestsSummaryCard(data),
                     const SizedBox(height: 25),
 
@@ -504,20 +511,28 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
   }
 
   // ==========================================
-  // الويدجت (Widgets) الفرعية المحدثة[cite: 2]
+  // الويدجت (Widgets) الفرعية
   // ==========================================
 
+  // 🌟 كارد إدارة بلاغات الحجاج المُحدث 🌟
   Widget _buildRequestsSummaryCard(Map<String, dynamic> data) {
+    int newReq = data['newRequests'] ?? 0;
+    int pendingReq = data['pendingRequests'] ?? 0;
+    int resolvedReq = data['resolvedRequests'] ?? 0;
+
+    // التنبيه يصير أحمر إذا فيه طلبات جديدة (new) محد لمسها، ويصير برتقالي إذا فيه مؤجلة
+    Color borderColor = newReq > 0
+        ? Colors.redAccent.withOpacity(0.5)
+        : (pendingReq > 0
+              ? Colors.orangeAccent.withOpacity(0.3)
+              : const Color(0xFFA07B4F).withOpacity(0.3));
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: (data['pendingRequests'] ?? 0) > 0
-              ? Colors.orangeAccent.withOpacity(0.3)
-              : const Color(0xFFA07B4F).withOpacity(0.3),
-        ),
+        border: Border.all(color: borderColor, width: 1.5),
       ),
       child: Column(
         children: [
@@ -537,7 +552,7 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
           ),
           const SizedBox(height: 15),
           const Divider(color: Colors.white10),
-          const SizedBox(height: 10),
+          const SizedBox(height: 15),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -546,15 +561,12 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
                 '${data['totalRequests'] ?? 0}',
                 Colors.white,
               ),
+              _buildMiniStat('تم الحل ✅', '$resolvedReq', Colors.green),
+              _buildMiniStat('مؤجلة ⏳', '$pendingReq', Colors.orangeAccent),
               _buildMiniStat(
-                'تم الحل ✅',
-                '${data['resolvedRequests'] ?? 0}',
-                Colors.green,
-              ),
-              _buildMiniStat(
-                'معلقة ⏳',
-                '${data['pendingRequests'] ?? 0}',
-                Colors.orangeAccent,
+                'جديدة ⚠️',
+                '$newReq',
+                newReq > 0 ? Colors.redAccent : Colors.white54,
               ),
             ],
           ),
@@ -582,7 +594,6 @@ class _DailyReportDetailScreenState extends State<DailyReportDetailScreen> {
     );
   }
 
-  // بقية الويدجت (نفس الأكواد السابقة لم تتغير لضمان استقرار التصميم)
   Widget _buildResponseGapCard(int gapMinutes, bool hasTrips) {
     Color indicatorColor;
     String evaluationText;

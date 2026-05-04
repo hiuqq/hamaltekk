@@ -57,8 +57,8 @@ class _StaffRequestsScreenState extends State<StaffRequestsScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              _buildRequestsList('pending'), // تبويب الطلبات المعلقة
-              _buildRequestsList('resolved'), // تبويب الطلبات المنجزة
+              _buildRequestsList('pending'),
+              _buildRequestsList('resolved'),
             ],
           ),
         ),
@@ -70,7 +70,6 @@ class _StaffRequestsScreenState extends State<StaffRequestsScreen>
     final String? supervisorId = FirebaseAuth.instance.currentUser?.uid;
 
     return StreamBuilder<DocumentSnapshot>(
-      // 1. جلب بيانات المشرف أولاً لمعرفة مجموعة (group_id)
       stream: FirebaseFirestore.instance
           .collection('Users')
           .doc(supervisorId)
@@ -85,18 +84,16 @@ class _StaffRequestsScreenState extends State<StaffRequestsScreen>
         String groupId = userData['group_id'] ?? '';
 
         return StreamBuilder<QuerySnapshot>(
-          // 2. جلب الطلبات اللي تنتمي لنفس المجموعة وبحسب الحالة المطلوبة
           stream: FirebaseFirestore.instance
               .collection('SupportRequests')
               .where('group_id', isEqualTo: groupId)
               .where('status', isEqualTo: status)
               .snapshots(),
           builder: (context, requestSnapshot) {
-            if (requestSnapshot.connectionState == ConnectionState.waiting) {
+            if (requestSnapshot.connectionState == ConnectionState.waiting)
               return const Center(
                 child: CircularProgressIndicator(color: Color(0xFFA07B4F)),
               );
-            }
 
             if (!requestSnapshot.hasData ||
                 requestSnapshot.data!.docs.isEmpty) {
@@ -114,7 +111,7 @@ class _StaffRequestsScreenState extends State<StaffRequestsScreen>
                     const SizedBox(height: 15),
                     Text(
                       status == 'pending'
-                          ? 'لا توجد طلبات جديدة'
+                          ? 'لا توجد طلبات معلقة'
                           : 'السجل فارغ',
                       style: const TextStyle(
                         color: Colors.white54,
@@ -126,7 +123,6 @@ class _StaffRequestsScreenState extends State<StaffRequestsScreen>
               );
             }
 
-            // ترتيب الطلبات (الأحدث فوق) يدوياً لتجنب مشاكل الـ Index في البداية
             var docs = requestSnapshot.data!.docs.toList();
             docs.sort((a, b) {
               Timestamp? tA = (a.data() as Map<String, dynamic>)['created_at'];
@@ -256,7 +252,6 @@ class _StaffRequestsScreenState extends State<StaffRequestsScreen>
     );
   }
 
-  // 🌟 دالة تحديث حالة الطلب
   Future<void> _markAsResolved(String docId) async {
     try {
       await FirebaseFirestore.instance

@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:hamaltekk/screens/chat_screen.dart'; // 🌟 استدعاء شاشة المحادثة
+import 'package:hamaltekk/screens/chat_screen.dart';
 
 class PilgrimTripsScreen extends StatelessWidget {
   const PilgrimTripsScreen({super.key});
@@ -55,21 +55,21 @@ class PilgrimTripsScreen extends StatelessWidget {
                     }
 
                     return StreamBuilder<QuerySnapshot>(
+                      // 1. جلب التمبلت الأساسي ليعمل كمسودة
                       stream: FirebaseFirestore.instance
-                          .collection('Trips')
-                          .where('group_id', isEqualTo: groupId)
+                          .collection('TripTemplates')
+                          .orderBy('order')
                           .snapshots(),
-                      builder: (context, tripSnapshot) {
-                        if (tripSnapshot.hasError) {
+                      builder: (context, templateSnapshot) {
+                        if (templateSnapshot.hasError) {
                           return const Center(
                             child: Text(
-                              'حدث خطأ في جلب البيانات',
+                              'حدث خطأ',
                               style: TextStyle(color: Colors.redAccent),
                             ),
                           );
                         }
-
-                        if (tripSnapshot.connectionState ==
+                        if (templateSnapshot.connectionState ==
                             ConnectionState.waiting) {
                           return const Center(
                             child: CircularProgressIndicator(
@@ -78,61 +78,93 @@ class PilgrimTripsScreen extends StatelessWidget {
                           );
                         }
 
-                        if (!tripSnapshot.hasData ||
-                            tripSnapshot.data!.docs.isEmpty) {
-                          return _buildEmptyState();
-                        }
-
-                        // الفلتر الذكي: إخفاء التمبلت إذا فيه رحلة معبأة
-                        Map<String, DocumentSnapshot> uniqueTrips = {};
-
-                        for (var doc in tripSnapshot.data!.docs) {
-                          var data = doc.data() as Map<String, dynamic>;
-                          String templateId = data['template_id'] ?? doc.id;
-
-                          if (uniqueTrips.containsKey(templateId)) {
-                            var existingData =
-                                uniqueTrips[templateId]!.data()
-                                    as Map<String, dynamic>;
-                            if (data['scheduled_at'] != null &&
-                                existingData['scheduled_at'] == null) {
-                              uniqueTrips[templateId] = doc;
+                        return StreamBuilder<QuerySnapshot>(
+                          // 2. جلب الرحلات الحقيقية التي أنشأها المشرف
+                          stream: FirebaseFirestore.instance
+                              .collection('Trips')
+                              .where('group_id', isEqualTo: groupId)
+                              .snapshots(),
+                          builder: (context, tripSnapshot) {
+                            if (tripSnapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFFA07B4F),
+                                ),
+                              );
                             }
-                          } else {
-                            uniqueTrips[templateId] = doc;
-                          }
-                        }
 
-                        var trips = uniqueTrips.values.toList();
+                            // دمج البيانات
+                            Map<String, Map<String, dynamic>> finalTrips = {};
 
-                        // ترتيب الرحلات زمنياً
-                        trips.sort((a, b) {
-                          Timestamp? timeA =
-                              (a.data()
-                                  as Map<String, dynamic>)['scheduled_at'];
-                          Timestamp? timeB =
-                              (b.data()
-                                  as Map<String, dynamic>)['scheduled_at'];
-                          if (timeA == null && timeB == null) return 0;
-                          if (timeA == null) return 1;
-                          if (timeB == null) return -1;
-                          return timeA.compareTo(timeB);
-                        });
+                            if (templateSnapshot.hasData) {
+                              for (var doc in templateSnapshot.data!.docs) {
+                                if (doc.id == 'other') continue;
 
-                        return ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                          itemCount: trips.length,
-                          itemBuilder: (context, index) {
-                            var tripData =
-                                trips[index].data() as Map<String, dynamic>;
-                            // نمرر userId عشان نحتاجه في المحادثة
-                            return _buildPilgrimTripCard(
-                              context,
-                              tripData,
-                              userId ?? '',
+                                finalTrips[doc.id] = {
+                                  'template_id': doc.id,
+                                  'title': doc['title'],
+                                  'is_placeholder': true,
+                                  'order': doc['order'] ?? 99,
+                                };
+                              }
+                            }
+
+                            if (tripSnapshot.hasData) {
+                              for (var doc in tripSnapshot.data!.docs) {
+                                var data = doc.data() as Map<String, dynamic>;
+                                String tId = data['template_id'] ?? 'other';
+
+                                if (tId == 'other') {
+                                  finalTrips[doc.id] = {
+                                    ...data,
+                                    'is_placeholder': false,
+                                    'order': 100,
+                                  };
+                                } else {
+                                  finalTrips[tId] = {
+                                    ...data,
+                                    'is_placeholder': false,
+                                    'order': finalTrips[tId]?['order'] ?? 99,
+                                  };
+                                }
+                              }
+                            }
+
+                            var trips = finalTrips.values.toList();
+
+                            // 🌟 الترتيب الجديد الذكي 🌟
+                            trips.sort((a, b) {
+                              bool isPlaceholderA =
+                                  a['is_placeholder'] ?? false;
+                              bool isPlaceholderB =
+                                  b['is_placeholder'] ?? false;
+
+                              // 1. الأولوية: الرحلات الفعالة (الكارد الكبير) تظهر فوق المجدولة
+                              if (!isPlaceholderA && isPlaceholderB) return -1;
+                              if (isPlaceholderA && !isPlaceholderB) return 1;
+
+                              // 2. إذا كانوا نفس النوع، نرتبهم حسب تسلسل الرحلة (order)
+                              int orderA = a['order'] as int? ?? 99;
+                              int orderB = b['order'] as int? ?? 99;
+                              return orderA.compareTo(orderB);
+                            });
+
+                            if (trips.isEmpty) return _buildEmptyState();
+
+                            return ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                              itemCount: trips.length,
+                              itemBuilder: (context, index) {
+                                return _buildPilgrimTripCard(
+                                  context,
+                                  trips[index],
+                                  userId ?? '',
+                                );
+                              },
                             );
                           },
                         );
@@ -176,13 +208,64 @@ class PilgrimTripsScreen extends StatelessWidget {
   Widget _buildPilgrimTripCard(
     BuildContext context,
     Map<String, dynamic> tripData,
-    String currentPilgrimId, // 🌟 استقبلنا رقم الحاج هنا
+    String currentPilgrimId,
   ) {
-    Timestamp? scheduledAt = tripData['scheduled_at'];
-    String timeString = "غير محدد";
-    String dateString = "غير محدد";
+    bool isPlaceholder = tripData['is_placeholder'] ?? false;
 
-    // 🌟 سحبنا الـ UID الخاص بمشرف الرحلة
+    // 🌟 الكارد الصغير للمسودات 🌟
+    if (isPlaceholder) {
+      String title = tripData['title'] ?? 'وجهة مجدولة';
+      return Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.02),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.white12, width: 1),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'رحلة مجدولة - بانتظار تحديد الباص',
+                  style: TextStyle(color: Color(0xFFA07B4F), fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(width: 15),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white12),
+              ),
+              child: const Icon(
+                Icons.schedule,
+                color: Colors.white38,
+                size: 22,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 🌟 الكارد الكبير للرحلات الفعالة 🌟
+    Timestamp? scheduledAt = tripData['scheduled_at'];
+    String timeString = "غير محدد", dateString = "غير محدد";
     String supervisorId = tripData['created_by'] ?? '';
 
     if (scheduledAt != null) {
@@ -190,7 +273,7 @@ class PilgrimTripsScreen extends StatelessWidget {
       timeString = DateFormat(
         'hh:mm a',
       ).format(dt).replaceAll('AM', 'صباحًا').replaceAll('PM', 'مساءً');
-      dateString = DateFormat('dd/MM/yyyy').format(dt);
+      dateString = DateFormat('yyyy/MM/dd').format(dt);
     }
 
     String status = tripData['status'] ?? 'scheduled';
@@ -198,17 +281,19 @@ class PilgrimTripsScreen extends StatelessWidget {
     String templateId = tripData['template_id'] ?? '';
 
     String destination = "غير محدد";
-    if (templateId.contains('mina_to_arafat'))
+    if (templateId == 'other') {
+      destination = tripData['custom_destination'] ?? 'وجهة مخصصة';
+    } else if (templateId.contains('mina_to_arafat')) {
       destination = "عرفة";
-    else if (templateId.contains('arafat_to_muzdalifa'))
+    } else if (templateId.contains('arafat_to_muzdalifa')) {
       destination = "مزدلفة";
-    else if (templateId.contains('muzdalifa_to_mina'))
+    } else if (templateId.contains('muzdalifa_to_mina')) {
       destination = "منى";
+    }
 
     List<Color> gradientColors;
     Color borderColor;
     String statusText;
-
     if (status == 'active') {
       gradientColors = [const Color(0xFF384333), const Color(0xFF232B1F)];
       borderColor = Colors.green.withOpacity(0.3);
@@ -242,13 +327,11 @@ class PilgrimTripsScreen extends StatelessWidget {
           ),
         ],
       ),
-      // 🌟 غلفنا المحتوى بـ Column عشان نضيف قسم المشرف تحت معلومات الرحلة
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // زر الموقع التفاعلي
               GestureDetector(
                 onTap: () => _openGoogleMaps(context, tripData),
                 child: Column(
@@ -275,9 +358,7 @@ class PilgrimTripsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-
               const Spacer(),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -297,7 +378,6 @@ class PilgrimTripsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 15),
-
                   _buildTripDataRow(Icons.map_outlined, 'إلى : $destination'),
                   _buildTripDataRow(
                     Icons.calendar_month_outlined,
@@ -311,9 +391,7 @@ class PilgrimTripsScreen extends StatelessWidget {
                     Icons.directions_bus_outlined,
                     'رقم الباص : $busId',
                   ),
-
                   const SizedBox(height: 12),
-
                   Text(
                     statusText,
                     style: const TextStyle(
@@ -326,14 +404,12 @@ class PilgrimTripsScreen extends StatelessWidget {
               ),
             ],
           ),
-
-          // 🌟 إضافة قسم مشرف الرحلة والمحادثة (إذا كان المشرف موجود)
           if (supervisorId.isNotEmpty) ...[
             const SizedBox(height: 20),
             Container(
               height: 1,
               width: double.infinity,
-              color: Colors.white.withOpacity(0.1), // فاصل خفيف أنيق
+              color: Colors.white.withOpacity(0.1),
             ),
             const SizedBox(height: 15),
             _buildSupervisorInfo(context, supervisorId, currentPilgrimId),
@@ -343,7 +419,6 @@ class PilgrimTripsScreen extends StatelessWidget {
     );
   }
 
-  // 🌟 دالة جديدة لعرض بيانات المشرف مع أيقونة المحادثة
   Widget _buildSupervisorInfo(
     BuildContext context,
     String supervisorId,
@@ -356,13 +431,11 @@ class PilgrimTripsScreen extends StatelessWidget {
           .get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox();
-
         var data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
         String name = data['info']?['name'] ?? 'مشرف الرحلة';
 
         return Row(
           children: [
-            // أيقونة المحادثة (يسار)
             Container(
               decoration: BoxDecoration(
                 color: const Color(0xFFA07B4F).withOpacity(0.2),
@@ -375,14 +448,13 @@ class PilgrimTripsScreen extends StatelessWidget {
                   size: 20,
                 ),
                 onPressed: () {
-                  // 🌟 تكوين المعرف المشترك للمحادثة (بنفس ترتيب شاشة المشرف: المشرف_الحاج)
                   String chatId = '${supervisorId}_$currentPilgrimId';
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => ChatScreen(
                         chatId: chatId,
-                        otherUserName: name, // اسم المشرف
+                        otherUserName: name,
                         currentUserId: currentPilgrimId,
                       ),
                     ),
@@ -390,10 +462,7 @@ class PilgrimTripsScreen extends StatelessWidget {
                 },
               ),
             ),
-
             const Spacer(),
-
-            // بيانات واسم المشرف (يمين)
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -448,36 +517,30 @@ class PilgrimTripsScreen extends StatelessWidget {
     BuildContext context,
     Map<String, dynamic> tripData,
   ) async {
-    double? lat = tripData['bus_lat'];
-    double? lng = tripData['bus_lng'];
-
+    double? lat = tripData['bus_lat'], lng = tripData['bus_lng'];
     if (lat == null || lng == null) {
-      if (context.mounted) {
+      if (context.mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('لم يتم تحديث موقع الحافلة لهذه الرحلة حتى الآن.'),
             backgroundColor: Colors.orange,
           ),
         );
-      }
       return;
     }
-
     try {
-      final String googleMapsUrl =
-          'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-      final Uri url = Uri.parse(googleMapsUrl);
-
+      final Uri url = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+      );
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
-      if (context.mounted) {
+      if (context.mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('حدث خطأ أثناء فتح الخريطة.'),
             backgroundColor: Colors.redAccent,
           ),
         );
-      }
     }
   }
 

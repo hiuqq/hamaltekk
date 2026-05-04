@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hamaltekk/screens/pilgrim_requests_history_screen.dart'; // 🌟 استدعاء شاشة السجل الجديدة
+import 'package:hamaltekk/screens/pilgrim_requests_history_screen.dart';
 
 class HelpRequestBottomSheet extends StatefulWidget {
   const HelpRequestBottomSheet({super.key});
@@ -14,7 +14,6 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
   int _selectedCategoryIndex = -1;
   final TextEditingController _noteController = TextEditingController();
 
-  // 🌟 إضافة أيام الحج لربط الطلب بتقرير المشرف
   String? selectedDay;
   final List<Map<String, String>> hajjDays = [
     {'key': 'day_8', 'title': 'يوم التروية'},
@@ -69,7 +68,6 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
               ),
               const SizedBox(height: 20),
 
-              // 🌟 العنوان مع زر السجل على اليسار
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -99,21 +97,20 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
                     ),
                     tooltip: 'سجل طلباتي',
                     onPressed: () {
-                      Navigator.pop(context); // إغلاق النافذة الحالية
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
                               const PilgrimRequestsHistoryScreen(),
                         ),
-                      ); // فتح السجل
+                      );
                     },
                   ),
                 ],
               ),
               const SizedBox(height: 15),
 
-              // 🌟 قائمة اختيار اليوم (مهمة لتقرير المشرف)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 15),
                 decoration: BoxDecoration(
@@ -135,12 +132,14 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
                       color: Colors.white70,
                     ),
                     style: const TextStyle(color: Colors.white, fontSize: 14),
-                    items: hajjDays.map((day) {
-                      return DropdownMenuItem<String>(
-                        value: day['key'],
-                        child: Text(day['title']!),
-                      );
-                    }).toList(),
+                    items: hajjDays
+                        .map(
+                          (day) => DropdownMenuItem<String>(
+                            value: day['key'],
+                            child: Text(day['title']!),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (newValue) =>
                         setState(() => selectedDay = newValue),
                   ),
@@ -270,7 +269,6 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
                       var groupId = userData['group_id'];
                       var info = userData['info'] ?? {};
 
-                      // 🌟 إضافة حقل اليوم (day) للفايربيس
                       await FirebaseFirestore.instance
                           .collection('SupportRequests')
                           .add({
@@ -280,14 +278,15 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
                             'category':
                                 _categories[_selectedCategoryIndex]['title'],
                             'note': _noteController.text.trim(),
-                            'day': selectedDay, // 🌟 عشان التقرير
-                            'status': 'pending',
+                            'day': selectedDay,
+                            'status':
+                                'new', // 🌟 غيرناها لـ new عشان تطلع للمشرف كطلب جديد
                             'created_at': FieldValue.serverTimestamp(),
                           });
 
                       if (context.mounted) {
-                        Navigator.pop(context); // إغلاق التحميل
-                        Navigator.pop(context); // إغلاق النافذة
+                        Navigator.pop(context);
+                        Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('تم إرسال طلبك للمشرف بنجاح.'),
@@ -297,7 +296,6 @@ class _HelpRequestBottomSheetState extends State<HelpRequestBottomSheet> {
                       }
                     } catch (e) {
                       Navigator.pop(context);
-                      print("Error sending request: $e");
                     }
                   },
                   child: const Text(

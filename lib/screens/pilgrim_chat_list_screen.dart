@@ -26,6 +26,7 @@ class PilgrimChatListScreen extends StatelessWidget {
               _buildAppBar(),
 
               Expanded(
+                // 1. جلب بيانات الحاج لمعرفة مجموعته
                 child: FutureBuilder<DocumentSnapshot>(
                   future: FirebaseFirestore.instance
                       .collection('Users')
@@ -54,6 +55,7 @@ class PilgrimChatListScreen extends StatelessWidget {
                       );
                     }
 
+                    // 2. جلب المشرف الأساسي للمجموعة
                     return FutureBuilder<QuerySnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('Users')
@@ -71,36 +73,109 @@ class PilgrimChatListScreen extends StatelessWidget {
                           );
                         }
 
-                        if (!supervisorSnapshot.hasData ||
-                            supervisorSnapshot.data!.docs.isEmpty) {
-                          return const Center(
-                            child: Text(
-                              'لم يتم تعيين مشرف لمجموعتك حتى الآن',
-                              style: TextStyle(color: Colors.white54),
-                            ),
-                          );
+                        String? mainSupervisorId;
+                        String mainSupervisorName = 'المشرف';
+
+                        if (supervisorSnapshot.hasData &&
+                            supervisorSnapshot.data!.docs.isNotEmpty) {
+                          var supervisorDoc =
+                              supervisorSnapshot.data!.docs.first;
+                          mainSupervisorId = supervisorDoc.id;
+                          mainSupervisorName =
+                              (supervisorDoc.data()
+                                  as Map<String, dynamic>)['info']?['name'] ??
+                              'المشرف الأساسي';
                         }
 
-                        var supervisorDoc = supervisorSnapshot.data!.docs.first;
-                        var supervisorData =
-                            supervisorDoc.data() as Map<String, dynamic>;
-                        String supervisorId = supervisorDoc.id;
-                        String supervisorName =
-                            supervisorData['info']?['name'] ?? 'المشرف';
+                        // 3. جلب كل المحادثات النشطة الخاصة بالحاج
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('Chats')
+                              .orderBy('last_time', descending: true)
+                              .snapshots(),
+                          builder: (context, chatSnapshot) {
+                            List<Widget> chatCards = [];
 
-                        String chatId = '${supervisorId}_$currentUserId';
+                            // 🌟 أولاً: إضافة كارت المشرف الأساسي (دائماً في الأعلى)
+                            if (mainSupervisorId != null) {
+                              String mainChatId =
+                                  '${mainSupervisorId}_$currentUserId';
+                              chatCards.add(
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 15),
+                                  child: _buildChatCard(
+                                    context,
+                                    mainChatId,
+                                    mainSupervisorName,
+                                    currentUserId,
+                                  ),
+                                ),
+                              );
+                            }
 
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 25,
-                            vertical: 10,
-                          ),
-                          child: _buildChatCard(
-                            context,
-                            chatId,
-                            supervisorName,
-                            currentUserId,
-                          ),
+                            // 🌟 ثانياً: إضافة محادثات مشرفي الباصات (إذا وجدت) وتحت المشرف الأساسي
+                            if (chatSnapshot.hasData &&
+                                chatSnapshot.data!.docs.isNotEmpty) {
+                              var otherChats = chatSnapshot.data!.docs.where((
+                                doc,
+                              ) {
+                                bool involvesCurrentUser = doc.id.contains(
+                                  currentUserId,
+                                );
+                                bool isNotMainSupervisor =
+                                    mainSupervisorId == null ||
+                                    !doc.id.contains(mainSupervisorId);
+                                return involvesCurrentUser &&
+                                    isNotMainSupervisor;
+                              }).toList();
+
+                              for (var doc in otherChats) {
+                                String chatId = doc.id;
+                                List<String> ids = chatId.split('_');
+                                String otherUserId = ids[0] == currentUserId
+                                    ? ids[1]
+                                    : ids[0];
+
+                                chatCards.add(
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 15),
+                                    child: FutureBuilder<DocumentSnapshot>(
+                                      future: FirebaseFirestore.instance
+                                          .collection('Users')
+                                          .doc(otherUserId)
+                                          .get(),
+                                      builder: (context, otherUserSnap) {
+                                        if (!otherUserSnap.hasData)
+                                          return const SizedBox();
+                                        String otherName =
+                                            (otherUserSnap.data!.data()
+                                                as Map<
+                                                  String,
+                                                  dynamic
+                                                >?)?['info']?['name'] ??
+                                            'مشرف الرحلة';
+
+                                        return _buildChatCard(
+                                          context,
+                                          chatId,
+                                          otherName,
+                                          currentUserId,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+
+                            return ListView(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 25,
+                                vertical: 10,
+                              ),
+                              children: chatCards,
+                            );
+                          },
                         );
                       },
                     );
@@ -139,6 +214,7 @@ class PilgrimChatListScreen extends StatelessWidget {
     );
   }
 
+  // 🌟 دالة بناء الكارد بنفس التصميم المستطيل القديم اللي طلبتيه
   Widget _buildChatCard(
     BuildContext context,
     String chatId,
@@ -176,7 +252,6 @@ class PilgrimChatListScreen extends StatelessWidget {
             child: BackdropFilter(
               filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
               child: Container(
-                // 🌟 التعديل هنا: كبرنا المساحة الداخلية عمودياً وأفقياً عشان يكبر المستطيل
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 22,
@@ -208,8 +283,7 @@ class PilgrimChatListScreen extends StatelessWidget {
                             'المشرف: $supervisorName',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize:
-                                  17, // 🌟 كبرنا الخط نتفة ليتناسب مع الكرت
+                              fontSize: 17,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'IBMPlexSans',
                             ),
@@ -221,7 +295,7 @@ class PilgrimChatListScreen extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white70,
-                              fontSize: 13, // 🌟 كبرنا خط الرسالة
+                              fontSize: 13,
                               fontFamily: 'IBMPlexSans',
                             ),
                             textAlign: TextAlign.right,
@@ -233,7 +307,7 @@ class PilgrimChatListScreen extends StatelessWidget {
                     const Icon(
                       Icons.people_outline,
                       color: Colors.white,
-                      size: 28, // 🌟 كبرنا الأيقونة
+                      size: 28,
                     ),
                   ],
                 ),

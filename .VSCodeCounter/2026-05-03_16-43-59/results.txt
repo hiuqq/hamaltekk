@@ -1,0 +1,169 @@
+Date : 2026-05-03 16:43:59
+Directory : c:\hamaltekk
+Total : 87 files,  11069 codes, 537 comments, 1053 blanks, all 12659 lines
+
+Languages
++-----------------+------------+------------+------------+------------+------------+
+| language        | files      | code       | comment    | blank      | total      |
++-----------------+------------+------------+------------+------------+------------+
+| Dart            |         34 |      9,116 |        251 |        698 |     10,065 |
+| C++             |         16 |        580 |        136 |        191 |        907 |
+| CMake           |          8 |        471 |          0 |         92 |        563 |
+| XML             |         10 |        470 |         53 |         12 |        535 |
+| JSON            |          6 |        278 |          0 |          4 |        282 |
+| Swift           |          6 |         71 |          7 |         21 |         99 |
+| YAML            |          2 |         44 |         75 |         19 |        138 |
+| HTML            |          1 |         19 |         15 |          5 |         39 |
+| Markdown        |          2 |         13 |          0 |          9 |         22 |
+| Java Properties |          2 |          7 |          0 |          2 |          9 |
++-----------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                       | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                          |         87 |     11,069 |        537 |      1,053 |     12,659 |
+| . (Files)                                                                  |          4 |         55 |         75 |         26 |        156 |
+| android                                                                    |         10 |        102 |         51 |         11 |        164 |
+| android (Files)                                                            |          1 |          2 |          0 |          1 |          3 |
+| android\app                                                                |          8 |         95 |         51 |          9 |        155 |
+| android\app (Files)                                                        |          1 |         29 |          0 |          0 |         29 |
+| android\app\src                                                            |          7 |         66 |         51 |          9 |        126 |
+| android\app\src\debug                                                      |          1 |          3 |          4 |          1 |          8 |
+| android\app\src\main                                                       |          5 |         60 |         43 |          7 |        110 |
+| android\app\src\main (Files)                                               |          1 |         34 |         11 |          1 |         46 |
+| android\app\src\main\res                                                   |          4 |         26 |         32 |          6 |         64 |
+| android\app\src\main\res\drawable                                          |          1 |          4 |          7 |          2 |         13 |
+| android\app\src\main\res\drawable-v21                                      |          1 |          4 |          7 |          2 |         13 |
+| android\app\src\main\res\values                                            |          1 |          9 |          9 |          1 |         19 |
+| android\app\src\main\res\values-night                                      |          1 |          9 |          9 |          1 |         19 |
+| android\app\src\profile                                                    |          1 |          3 |          4 |          1 |          8 |
+| android\gradle                                                             |          1 |          5 |          0 |          1 |          6 |
+| android\gradle\wrapper                                                     |          1 |          5 |          0 |          1 |          6 |
+| ios                                                                        |          8 |        229 |          4 |         13 |        246 |
+| ios\Runner                                                                 |          7 |        222 |          2 |          9 |        233 |
+| ios\Runner (Files)                                                         |          2 |         13 |          0 |          3 |         16 |
+| ios\RunnerTests                                                            |          1 |          7 |          2 |          4 |         13 |
+| ios\Runner\Assets.xcassets                                                 |          3 |        148 |          0 |          4 |        152 |
+| ios\Runner\Assets.xcassets\AppIcon.appiconset                              |          1 |        122 |          0 |          1 |        123 |
+| ios\Runner\Assets.xcassets\LaunchImage.imageset                            |          2 |         26 |          0 |          3 |         29 |
+| ios\Runner\Base.lproj                                                      |          2 |         61 |          2 |          2 |         65 |
+| lib                                                                        |         33 |      9,102 |        241 |        691 |     10,034 |
+| lib (Files)                                                                |          2 |        122 |         23 |         21 |        166 |
+| lib\models                                                                 |          1 |         33 |          2 |          5 |         40 |
+| lib\screens                                                                |         24 |      7,284 |        177 |        537 |      7,998 |
+| lib\services                                                               |          1 |         41 |          5 |          8 |         54 |
+| lib\widgets                                                                |          5 |      1,622 |         34 |        120 |      1,776 |
+| linux                                                                      |          9 |        350 |         42 |         94 |        486 |
+| linux (Files)                                                              |          1 |        104 |          0 |         25 |        129 |
+| linux\flutter                                                              |          4 |        116 |          9 |         27 |        152 |
+| linux\runner                                                               |          4 |        130 |         33 |         42 |        205 |
+| macos                                                                      |          6 |        463 |          5 |         17 |        485 |
+| macos\Flutter                                                              |          1 |         22 |          3 |          4 |         29 |
+| macos\Runner                                                               |          4 |        434 |          0 |          9 |        443 |
+| macos\Runner (Files)                                                       |          2 |         23 |          0 |          7 |         30 |
+| macos\RunnerTests                                                          |          1 |          7 |          2 |          4 |         13 |
+| macos\Runner\Assets.xcassets                                               |          1 |         68 |          0 |          1 |         69 |
+| macos\Runner\Assets.xcassets\AppIcon.appiconset                            |          1 |         68 |          0 |          1 |         69 |
+| macos\Runner\Base.lproj                                                    |          1 |        343 |          0 |          1 |        344 |
+| test                                                                       |          1 |         14 |         10 |          7 |         31 |
+| web                                                                        |          2 |         54 |         15 |          6 |         75 |
+| windows                                                                    |         14 |        700 |         94 |        188 |        982 |
+| windows (Files)                                                            |          1 |         89 |          0 |         20 |        109 |
+| windows\flutter                                                            |          4 |        149 |          9 |         29 |        187 |
+| windows\runner                                                             |          9 |        462 |         85 |        139 |        686 |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------+-----------------+------------+------------+------------+------------+
+| filename                                                                   | language        | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+-----------------+------------+------------+------------+------------+
+| c:\hamaltekk\README.md                                                     | Markdown        |         10 |          0 |          7 |         17 |
+| c:\hamaltekk\analysis_options.yaml                                         | YAML            |          3 |         22 |          4 |         29 |
+| c:\hamaltekk\android\app\google-services.json                              | JSON            |         29 |          0 |          0 |         29 |
+| c:\hamaltekk\android\app\src\debug\AndroidManifest.xml                     | XML             |          3 |          4 |          1 |          8 |
+| c:\hamaltekk\android\app\src\main\AndroidManifest.xml                      | XML             |         34 |         11 |          1 |         46 |
+| c:\hamaltekk\android\app\src\main\res\drawable-v21\launch_background.xml   | XML             |          4 |          7 |          2 |         13 |
+| c:\hamaltekk\android\app\src\main\res\drawable\launch_background.xml       | XML             |          4 |          7 |          2 |         13 |
+| c:\hamaltekk\android\app\src\main\res\values-night\styles.xml              | XML             |          9 |          9 |          1 |         19 |
+| c:\hamaltekk\android\app\src\main\res\values\styles.xml                    | XML             |          9 |          9 |          1 |         19 |
+| c:\hamaltekk\android\app\src\profile\AndroidManifest.xml                   | XML             |          3 |          4 |          1 |          8 |
+| c:\hamaltekk\android\gradle.properties                                     | Java Properties |          2 |          0 |          1 |          3 |
+| c:\hamaltekk\android\gradle\wrapper\gradle-wrapper.properties              | Java Properties |          5 |          0 |          1 |          6 |
+| c:\hamaltekk\firebase.json                                                 | JSON            |          1 |          0 |          0 |          1 |
+| c:\hamaltekk\ios\RunnerTests\RunnerTests.swift                             | Swift           |          7 |          2 |          4 |         13 |
+| c:\hamaltekk\ios\Runner\AppDelegate.swift                                  | Swift           |         12 |          0 |          2 |         14 |
+| c:\hamaltekk\ios\Runner\Assets.xcassets\AppIcon.appiconset\Contents.json   | JSON            |        122 |          0 |          1 |        123 |
+| c:\hamaltekk\ios\Runner\Assets.xcassets\LaunchImage.imageset\Contents.json | JSON            |         23 |          0 |          1 |         24 |
+| c:\hamaltekk\ios\Runner\Assets.xcassets\LaunchImage.imageset\README.md     | Markdown        |          3 |          0 |          2 |          5 |
+| c:\hamaltekk\ios\Runner\Base.lproj\LaunchScreen.storyboard                 | XML             |         36 |          1 |          1 |         38 |
+| c:\hamaltekk\ios\Runner\Base.lproj\Main.storyboard                         | XML             |         25 |          1 |          1 |         27 |
+| c:\hamaltekk\ios\Runner\Runner-Bridging-Header.h                           | C++             |          1 |          0 |          1 |          2 |
+| c:\hamaltekk\lib\firebase_options.dart                                     | Dart            |         70 |         12 |          7 |         89 |
+| c:\hamaltekk\lib\main.dart                                                 | Dart            |         52 |         11 |         14 |         77 |
+| c:\hamaltekk\lib\models\user_model.dart                                    | Dart            |         33 |          2 |          5 |         40 |
+| c:\hamaltekk\lib\screens\chat_screen.dart                                  | Dart            |        264 |         11 |         20 |        295 |
+| c:\hamaltekk\lib\screens\create_screen.dart                                | Dart            |        367 |         18 |         35 |        420 |
+| c:\hamaltekk\lib\screens\daily_report_detail_screen.dart                   | Dart            |        766 |         16 |         45 |        827 |
+| c:\hamaltekk\lib\screens\daily_reports_list_screen.dart                    | Dart            |        144 |          2 |          5 |        151 |
+| c:\hamaltekk\lib\screens\home_screen.dart                                  | Dart            |        789 |         16 |         60 |        865 |
+| c:\hamaltekk\lib\screens\login_screen.dart                                 | Dart            |        244 |          5 |         20 |        269 |
+| c:\hamaltekk\lib\screens\logo_screen.dart                                  | Dart            |         49 |          5 |          5 |         59 |
+| c:\hamaltekk\lib\screens\meal_history_screen.dart                          | Dart            |        181 |          2 |         10 |        193 |
+| c:\hamaltekk\lib\screens\otp_screen.dart                                   | Dart            |        326 |         14 |         29 |        369 |
+| c:\hamaltekk\lib\screens\pilgrim_chat_list_screen.dart                     | Dart            |        231 |          1 |         16 |        248 |
+| c:\hamaltekk\lib\screens\pilgrim_main_screen.dart                          | Dart            |         90 |         10 |         10 |        110 |
+| c:\hamaltekk\lib\screens\pilgrim_requests_history_screen.dart              | Dart            |        187 |          3 |         11 |        201 |
+| c:\hamaltekk\lib\screens\pilgrim_trips_screen.dart                         | Dart            |        452 |         11 |         41 |        504 |
+| c:\hamaltekk\lib\screens\pilgrims_boarding_screen.dart                     | Dart            |        303 |          6 |         22 |        331 |
+| c:\hamaltekk\lib\screens\pilgrims_list_screen.dart                         | Dart            |        286 |          5 |         20 |        311 |
+| c:\hamaltekk\lib\screens\profile_pilgrim_screen.dart                       | Dart            |        243 |          8 |         16 |        267 |
+| c:\hamaltekk\lib\screens\profile_staff_screen.dart                         | Dart            |        206 |          5 |         13 |        224 |
+| c:\hamaltekk\lib\screens\qr_scanner_screen.dart                            | Dart            |        381 |          3 |         24 |        408 |
+| c:\hamaltekk\lib\screens\scanner_screen.dart                               | Dart            |        129 |          8 |         16 |        153 |
+| c:\hamaltekk\lib\screens\staff_chat_list_screen.dart                       | Dart            |        298 |          6 |         21 |        325 |
+| c:\hamaltekk\lib\screens\staff_home_screen.dart                            | Dart            |        340 |          3 |         21 |        364 |
+| c:\hamaltekk\lib\screens\staff_main_screen.dart                            | Dart            |        206 |         11 |         17 |        234 |
+| c:\hamaltekk\lib\screens\staff_requests_screen.dart                        | Dart            |        266 |          4 |         15 |        285 |
+| c:\hamaltekk\lib\screens\staff_trips_screen.dart                           | Dart            |        536 |          4 |         45 |        585 |
+| c:\hamaltekk\lib\services\auth_service.dart                                | Dart            |         41 |          5 |          8 |         54 |
+| c:\hamaltekk\lib\widgets\add_meal_dialog.dart                              | Dart            |        285 |         15 |         26 |        326 |
+| c:\hamaltekk\lib\widgets\add_trip_dialog.dart                              | Dart            |        588 |          3 |         41 |        632 |
+| c:\hamaltekk\lib\widgets\hajj_info_overlays.dart                           | Dart            |        272 |          3 |         21 |        296 |
+| c:\hamaltekk\lib\widgets\help_request_bottom_sheet.dart                    | Dart            |        298 |          4 |         18 |        320 |
+| c:\hamaltekk\lib\widgets\pdf_export_service.dart                           | Dart            |        179 |          9 |         14 |        202 |
+| c:\hamaltekk\linux\CMakeLists.txt                                          | CMake           |        104 |          0 |         25 |        129 |
+| c:\hamaltekk\linux\flutter\CMakeLists.txt                                  | CMake           |         79 |          0 |         10 |         89 |
+| c:\hamaltekk\linux\flutter\generated_plugin_registrant.cc                  | C++             |         11 |          4 |          5 |         20 |
+| c:\hamaltekk\linux\flutter\generated_plugin_registrant.h                   | C++             |          5 |          5 |          6 |         16 |
+| c:\hamaltekk\linux\flutter\generated_plugins.cmake                         | CMake           |         21 |          0 |          6 |         27 |
+| c:\hamaltekk\linux\runner\CMakeLists.txt                                   | CMake           |         21 |          0 |          6 |         27 |
+| c:\hamaltekk\linux\runner\main.cc                                          | C++             |          5 |          0 |          2 |          7 |
+| c:\hamaltekk\linux\runner\my_application.cc                                | C++             |         94 |         26 |         29 |        149 |
+| c:\hamaltekk\linux\runner\my_application.h                                 | C++             |         10 |          7 |          5 |         22 |
+| c:\hamaltekk\macos\Flutter\GeneratedPluginRegistrant.swift                 | Swift           |         22 |          3 |          4 |         29 |
+| c:\hamaltekk\macos\RunnerTests\RunnerTests.swift                           | Swift           |          7 |          2 |          4 |         13 |
+| c:\hamaltekk\macos\Runner\AppDelegate.swift                                | Swift           |         11 |          0 |          3 |         14 |
+| c:\hamaltekk\macos\Runner\Assets.xcassets\AppIcon.appiconset\Contents.json | JSON            |         68 |          0 |          1 |         69 |
+| c:\hamaltekk\macos\Runner\Base.lproj\MainMenu.xib                          | XML             |        343 |          0 |          1 |        344 |
+| c:\hamaltekk\macos\Runner\MainFlutterWindow.swift                          | Swift           |         12 |          0 |          4 |         16 |
+| c:\hamaltekk\pubspec.yaml                                                  | YAML            |         41 |         53 |         15 |        109 |
+| c:\hamaltekk\test\widget_test.dart                                         | Dart            |         14 |         10 |          7 |         31 |
+| c:\hamaltekk\web\index.html                                                | HTML            |         19 |         15 |          5 |         39 |
+| c:\hamaltekk\web\manifest.json                                             | JSON            |         35 |          0 |          1 |         36 |
+| c:\hamaltekk\windows\CMakeLists.txt                                        | CMake           |         89 |          0 |         20 |        109 |
+| c:\hamaltekk\windows\flutter\CMakeLists.txt                                | CMake           |         98 |          0 |         12 |        110 |
+| c:\hamaltekk\windows\flutter\generated_plugin_registrant.cc                | C++             |         21 |          4 |          5 |         30 |
+| c:\hamaltekk\windows\flutter\generated_plugin_registrant.h                 | C++             |          5 |          5 |          6 |         16 |
+| c:\hamaltekk\windows\flutter\generated_plugins.cmake                       | CMake           |         25 |          0 |          6 |         31 |
+| c:\hamaltekk\windows\runner\CMakeLists.txt                                 | CMake           |         34 |          0 |          7 |         41 |
+| c:\hamaltekk\windows\runner\flutter_window.cpp                             | C++             |         49 |          7 |         16 |         72 |
+| c:\hamaltekk\windows\runner\flutter_window.h                               | C++             |         20 |          5 |          9 |         34 |
+| c:\hamaltekk\windows\runner\main.cpp                                       | C++             |         30 |          4 |         10 |         44 |
+| c:\hamaltekk\windows\runner\resource.h                                     | C++             |          9 |          6 |          2 |         17 |
+| c:\hamaltekk\windows\runner\utils.cpp                                      | C++             |         54 |          2 |         10 |         66 |
+| c:\hamaltekk\windows\runner\utils.h                                        | C++             |          8 |          6 |          6 |         20 |
+| c:\hamaltekk\windows\runner\win32_window.cpp                               | C++             |        210 |         24 |         55 |        289 |
+| c:\hamaltekk\windows\runner\win32_window.h                                 | C++             |         48 |         31 |         24 |        103 |
+| Total                                                                      |                 |     11,069 |        537 |      1,053 |     12,659 |
++----------------------------------------------------------------------------+-----------------+------------+------------+------------+------------+

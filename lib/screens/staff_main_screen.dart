@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // 🌟 إضافة الفايرستور
-import 'package:firebase_auth/firebase_auth.dart'; // 🌟 إضافة المصادقة
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:hamaltekk/screens/staff_home_screen.dart';
 import 'package:hamaltekk/screens/staff_trips_screen.dart';
@@ -24,21 +24,17 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
     const StaffProfileScreen(),
   ];
 
-  // ==========================================
-  // 🌟 تشغيل المستمع فور فتح شاشة المشرف
-  // ==========================================
   @override
   void initState() {
     super.initState();
     _listenForEmergencyRequests();
   }
 
-  // 🌟 دالة الاستماع لطلبات المساعدة الجديدة الخاصة بقروب المشرف
+  // 🌟 دالة الاستماع لطلبات المساعدة (الجديدة فقط)
   void _listenForEmergencyRequests() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // جلب بيانات المشرف لمعرفة الـ group_id الخاص به
     var userDoc = await FirebaseFirestore.instance
         .collection('Users')
         .doc(uid)
@@ -46,17 +42,15 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
     var groupId = userDoc.data()?['group_id'];
 
     if (groupId != null) {
-      // الاستماع للطلبات اللي حالتها pending وموجهة لقروبه
       FirebaseFirestore.instance
           .collection('SupportRequests')
           .where('group_id', isEqualTo: groupId)
-          .where('status', isEqualTo: 'pending')
+          .where('status', isEqualTo: 'new') // 🌟 نستمع للطلبات الجديدة فقط
           .snapshots()
           .listen((snapshot) {
             for (var change in snapshot.docChanges) {
               if (change.type == DocumentChangeType.added) {
                 var requestData = change.doc.data();
-                // إظهار الكارد التحذيري للمشرف
                 if (requestData != null && mounted) {
                   _showEmergencyCard(requestData, change.doc.id);
                 }
@@ -66,12 +60,11 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
     }
   }
 
-  // 🌟 دالة بناء كارد الطوارئ اللي بيطلع بوجه المشرف
+  // 🌟 الكارد المنبثق مع الخيارات الجديدة
   void _showEmergencyCard(Map<String, dynamic> data, String docId) {
     showDialog(
       context: context,
-      barrierDismissible:
-          false, // يمنع إغلاق الكارد بالنقر خارجه عشان ما يتجاهله
+      barrierDismissible: false,
       builder: (context) {
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -79,10 +72,7 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
             backgroundColor: const Color(0xFF1E1E1E),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(
-                color: Colors.redAccent,
-                width: 2,
-              ), // حواف حمراء طارئة
+              side: const BorderSide(color: Colors.redAccent, width: 2),
             ),
             title: const Row(
               children: [
@@ -127,31 +117,71 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
               ],
             ),
             actions: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFA07B4F),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              Row(
+                children: [
+                  // ⏳ زر التأجيل
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orangeAccent,
+                        side: const BorderSide(color: Colors.orangeAccent),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.schedule, size: 18),
+                      label: const Text(
+                        'تأجيل للسجل',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onPressed: () {
+                        // 🌟 تحويله لقيد الانتظار (يختفي من الشاشة ويروح لصندوق الطلبات)
+                        FirebaseFirestore.instance
+                            .collection('SupportRequests')
+                            .doc(docId)
+                            .update({'status': 'pending'});
+                        Navigator.pop(context);
+                      },
                     ),
                   ),
-                  onPressed: () {
-                    // تحديث حالة الطلب لـ resolved عشان يختفي وما يرجع يطلع له
-                    FirebaseFirestore.instance
-                        .collection('SupportRequests')
-                        .doc(docId)
-                        .update({'status': 'resolved'});
-                    Navigator.pop(context); // إغلاق الكارد
-                  },
-                  child: const Text(
-                    'استلام الطلب وإغلاق',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 10),
+                  // ✅ زر الحل فوراً
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text(
+                        'تم الحل',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onPressed: () {
+                        // 🌟 تحويله لمنجز فوراً
+                        FirebaseFirestore.instance
+                            .collection('SupportRequests')
+                            .doc(docId)
+                            .update({
+                              'status': 'resolved',
+                              'resolved_at': FieldValue.serverTimestamp(),
+                            });
+                        Navigator.pop(context);
+                      },
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -165,10 +195,7 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       extendBody: true,
-
       body: IndexedStack(index: _currentIndex, children: _screens),
-
-      // زر الكاميرا في المنتصف مع إطار ذهبي
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -184,8 +211,6 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
         child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-
-      // البار السفلي مع التوهج الذهبي
       bottomNavigationBar: BottomAppBar(
         color: const Color(0xFF1E1E1E).withOpacity(0.98),
         shape: const CircularNotchedRectangle(),
@@ -203,9 +228,7 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
                 Icons.directions_bus,
                 2,
               ),
-
               const SizedBox(width: 40),
-
               _buildNavItem(Icons.chat_bubble_outline, Icons.chat_bubble, 1),
               _buildNavItem(Icons.home_outlined, Icons.home, 0),
             ],
@@ -223,11 +246,7 @@ class _StaffMainScreenState extends State<StaffMainScreen> {
         color: isSelected ? const Color(0xFFA07B4F) : Colors.white54,
         size: isSelected ? 32 : 28,
       ),
-      onPressed: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
+      onPressed: () => setState(() => _currentIndex = index),
     );
   }
 }
