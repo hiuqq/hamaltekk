@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 🌟 إضافة مكتبة حماية المفاتيح
 
 // =============================================================
 // الجزء 1: دوال جلب البيانات
@@ -38,7 +39,8 @@ Future<String> calculateDistanceToJamarat() async {
 }
 
 Future<Map<String, dynamic>> fetchWeather() async {
-  const apiKey = '52a3c3c645f78d3902d69531818d958a';
+  // 🌟 جلب المفتاح بأمان من ملف .env
+  final apiKey = dotenv.env['WEATHER_API_KEY'] ?? '';
   const lat = '21.4172';
   const lon = '39.8944';
   final url =
@@ -162,7 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
     HousingService.autoAssignHousing();
   }
 
-  // دالة البحث عن المشرف بناءً على الـ group_id
   Future<String> fetchSupervisorFromDB(String? groupId) async {
     if (groupId == null) return "غير معين";
     try {
@@ -301,7 +302,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 30),
 
-                    // 🌟 تمرير الـ userId للباركود لضمان توافقه مع نظام المشرف
                     _buildQRCodeSection(userId ?? ''),
 
                     const SizedBox(height: 30),
@@ -401,9 +401,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Widgets ---
-
-  // 🌟 تحديث سكشن الباركود ليستخدم QrImageView
   Widget _buildQRCodeSection(String qrData) {
     return Center(
       child: Column(
@@ -422,17 +419,13 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFFA07B4F),
-                width: 2,
-              ), // إطار ذهبي خفيف
+              border: Border.all(color: const Color(0xFFA07B4F), width: 2),
             ),
             child: QrImageView(
-              data: qrData, // الـ ID حق الحاج
+              data: qrData,
               version: QrVersions.auto,
               size: 200.0,
-              backgroundColor:
-                  Colors.white, // خلفية بيضاء عشان الكاميرا تقرأه بسرعة
+              backgroundColor: Colors.white,
             ),
           ),
           const SizedBox(height: 10),

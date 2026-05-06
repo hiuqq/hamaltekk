@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-
-// استيراد الشاشات
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hamaltekk/screens/logo_screen.dart';
 import 'package:hamaltekk/screens/login_screen.dart';
 import 'package:hamaltekk/screens/create_screen.dart';
 import 'package:hamaltekk/screens/otp_screen.dart';
 import 'package:hamaltekk/screens/home_screen.dart';
 import 'package:hamaltekk/screens/pilgrim_main_screen.dart';
-import 'package:hamaltekk/screens/staff_main_screen.dart'; // 🌟 أضفنا استدعاء شاشة المشرف هنا
+import 'package:hamaltekk/screens/staff_main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: ".env");
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
@@ -52,8 +54,7 @@ class MyApp extends StatelessWidget {
         '/logo': (context) => const LogoScreen(),
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
-        '/staff_main': (context) =>
-            const StaffMainScreen(), // 🌟 أضفنا مسار المشرف هنا
+        '/staff_main': (context) => const StaffMainScreen(),
       },
     );
   }

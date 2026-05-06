@@ -1,0 +1,16 @@
+[33mcd35fc6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: checkout: moving from hind to main
+[33md4ab4cc[m[33m ([m[1;32mhind[m[33m)[m HEAD@{1}: commit: last but not least i hope
+[33mc2f6f48[m[33m ([m[1;31morigin/hind[m[33m)[m HEAD@{2}: reset: moving to c2f6f48
+[33mc2f6f48[m[33m ([m[1;31morigin/hind[m[33m)[m HEAD@{3}: commit: باذن الله انه اخر كوميت او قبل اللاخير :>
+[33m009ba84[m HEAD@{4}: commit: سويت شاشة المحاداثات للمشرف والحاج
+[33m1e5a021[m HEAD@{5}: commit: شاشة الماين للمشرف وللحاج
+[33m2cd6f59[m HEAD@{6}: commit: البار اللي تحت صارله شاشة لحاله
+[33m244f423[m HEAD@{7}: commit: انشاء شاشة رئيسية للمشرف
+[33m8819423[m HEAD@{8}: commit: تعديل على الشاشة الرئيسية للحاج بحيث يتم تعيين له
+[33medbb9d1[m HEAD@{9}: commit: ربط بالفاير بيس وتعديل كود انشاء الحساب بحيث اذا
+[33m8fd7e6a[m HEAD@{10}: commit: home screen adding by hind
+[33mcd35fc6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{11}: checkout: moving from hind to hind
+[33mcd35fc6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{12}: checkout: moving from hind to hind
+[33mcd35fc6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{13}: checkout: moving from main to hind
+[33mcd35fc6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{14}: commit: شاشة الهوم سكرين
+[33mca21dc2[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{15}: clone: from https://github.com/hiuqq/hamaltekk.git

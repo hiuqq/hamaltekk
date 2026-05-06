@@ -1,14 +1,13 @@
 import 'dart:math';
-import 'dart:convert'; // 🌟 مكتبة تحويل البيانات (إضافة صديقتك)
-import 'package:http/http.dart'
-    as http; // 🌟 مكتبة إرسال الطلبات للنت (إضافة صديقتك)
-
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // 🌟 ضروري للإشعارات
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 🌟 إضافة مكتبة حماية المفاتيح
 import 'package:hamaltekk/screens/login_screen.dart';
-import 'package:hamaltekk/screens/otp_screen.dart'; // 🌟 استدعاء شاشة الـ OTP (إضافة صديقتك)
+import 'package:hamaltekk/screens/otp_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -24,13 +23,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool isLoading = false;
 
   // ==========================================
-  // 🌟 دالة إرسال الإيميل (إضافة صديقتك)
+  // 🌟 دالة إرسال الإيميل (بالأكواد المخفية)
   // ==========================================
   Future<void> sendOtpEmail(String userEmail, String otpCode) async {
-    const serviceId = 'service_i8k6fwl';
-    const templateId = 'template_t5ts9eo';
-    const publicKey = 'v9Ve5x9gWZ-XEo--8';
-    const privateKey = 'pC3ojTtbkFvnmSfV1zN-F';
+    // 🌟 جلب المفاتيح بأمان من ملف .env
+    final serviceId = dotenv.env['EMAILJS_SERVICE_ID'] ?? '';
+    final templateId = dotenv.env['EMAILJS_TEMPLATE_ID'] ?? '';
+    final publicKey = dotenv.env['EMAILJS_PUBLIC_KEY'] ?? '';
+    final privateKey = dotenv.env['EMAILJS_PRIVATE_KEY'] ?? '';
 
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
 
@@ -70,7 +70,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
-      // 1. 🔔 جلب رمز الإشعارات (FCM Token) - شغلك الأساسي
       String? fcmToken;
       try {
         fcmToken = await FirebaseMessaging.instance.getToken();
@@ -78,7 +77,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         print("⚠️ تنبيه: فشل جلب التوكن (تأكد من إعدادات Firebase Messaging)");
       }
 
-      // 2. التحقق من كولكشن الحجاج (Nusk) - شغلك الأساسي
       var nuskDoc = await FirebaseFirestore.instance
           .collection('Nusk')
           .doc(refNo)
@@ -89,20 +87,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
       Map<String, dynamic> activeHajjTasks = {};
 
       if (nuskDoc.exists) {
-        userType = 'p'; // حاج
+        userType = 'p';
         infoData = nuskDoc.data()!;
       } else {
-        // 3. التحقق من كولكشن المشرفين (Staff) - شغلك الأساسي
         var staffDoc = await FirebaseFirestore.instance
             .collection('Staff')
             .doc(refNo)
             .get();
 
         if (staffDoc.exists) {
-          userType = 's'; // مشرف
+          userType = 's';
           infoData = staffDoc.data()!;
 
-          // سحب قوالب المهام وتحويلها لمهام نشطة
           var templates = staffDoc.data()?['task_templates'];
           if (templates != null && templates is Map) {
             templates.forEach((dayKey, taskList) {
@@ -125,13 +121,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
 
-      // 4. إنشاء الحساب في Firebase Auth - شغلك الأساسي
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
       String uid = userCredential.user!.uid;
-
-      // 5. 🔍 خوارزمية التعيين التلقائي للجروبات - شغلك الأساسي
       String? assignedGroupId;
 
       if (userType == 'p') {
@@ -161,7 +154,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
 
-      // 6. حفظ البيانات النهائية في كولكشن (Users) - شغلك الأساسي
       if (userType == 's') {
         infoData['active_hajj_tasks'] = activeHajjTasks;
       }
@@ -177,14 +169,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // ==========================================
-      // 7. 🚪 توليد وإرسال رمز التحقق والانتقال (إضافة صديقتك)
-      // ==========================================
-
-      // توليد رقم عشوائي من 4 خانات
       String generatedOtp = (Random().nextInt(9000) + 1000).toString();
 
-      // إرسال الإيميل في الخلفية
       await sendOtpEmail(email, generatedOtp);
 
       if (mounted) {
@@ -231,9 +217,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // ==========================================
-  // تصميم واجهة المستخدم (UI) - شغلك الأساسي وماتغير فيه ولا حرف 🌟
-  // ==========================================
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
