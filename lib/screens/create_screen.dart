@@ -70,6 +70,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
+      // ==========================================
+      // 🌟 التحقق من عدم تكرار الحساب بنفس رقم التصريح
+      // ==========================================
+      var existingUserCheck = await FirebaseFirestore.instance
+          .collection('Users')
+          .where('refNo', isEqualTo: refNo)
+          .get();
+
+      if (existingUserCheck.docs.isNotEmpty) {
+        _showSnackBar('هذا التصريح أو الرقم الوظيفي مسجل مسبقاً في النظام!');
+        setState(() => isLoading = false);
+        return; // إيقاف عملية التسجيل فوراً
+      }
+
       String? fcmToken;
       try {
         fcmToken = await FirebaseMessaging.instance.getToken();
@@ -162,7 +176,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'uid': uid,
         'email': email,
         'type': userType,
-        'refNo': refNo,
+        'refNo': refNo, // حفظ رقم التصريح لضمان عدم التكرار مستقبلاً
         'info': infoData,
         'group_id': assignedGroupId,
         'fcm_token': fcmToken,
@@ -189,7 +203,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
-        _showSnackBar('لديك حساب بالفعل! جاري تحويلك لتسجيل الدخول..');
+        _showSnackBar(
+          'البريد الإلكتروني مستخدم بالفعل! جاري تحويلك لتسجيل الدخول..',
+        );
         if (mounted) {
           Navigator.pushReplacement(
             context,
