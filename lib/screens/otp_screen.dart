@@ -1,16 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class OtpScreen extends StatefulWidget {
   final String actualOtp;
   final String userType;
-  final String email; // 🌟 أضفنا الإيميل عشان نعرضه بالشاشة
+  final String email;
+  final String password; // 🌟 استقبال الباسورد
+  final String refNo; // 🌟 استقبال رقم التصريح
 
   const OtpScreen({
     super.key,
     required this.actualOtp,
     required this.userType,
     required this.email,
+    required this.password,
+    required this.refNo,
   });
 
   @override
@@ -21,6 +28,7 @@ class _OtpScreenState extends State<OtpScreen> {
   List<String> otpValues = ["", "", "", ""];
   Timer? _timer;
   int _start = 110;
+  bool isLoading = false; // 🌟 حالة التحميل أثناء إنشاء الحساب الفعلي
 
   @override
   void initState() {
@@ -50,23 +58,138 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
-  void _verifyOtp() {
+  // ==========================================
+  // 🌟 دالة التحقق وإنشاء الحساب الفعلي 🌟
+  // ==========================================
+  Future<void> _verifyOtp() async {
     String enteredOtp = otpValues.join();
 
-    if (enteredOtp == widget.actualOtp) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم التحقق بنجاح!')));
-
-      if (widget.userType == 's') {
-        Navigator.pushReplacementNamed(context, '/staff_main');
-      } else {
-        Navigator.pushReplacementNamed(context, '/main');
-      }
-    } else {
+    if (enteredOtp != widget.actualOtp) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('الكود غير صحيح، حاول مرة أخرى')),
       );
+      return;
+    }
+
+    // إذا الكود صحيح، نبدأ عملية إنشاء الحساب
+    setState(() => isLoading = true);
+
+    try {
+      String? fcmToken;
+      try {
+        fcmToken = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        print("⚠️ تنبيه: فشل جلب التوكن");
+      }
+
+      Map<String, dynamic> infoData = {};
+      String? assignedGroupId;
+
+      // --- 1. جلب بيانات الحاج وتعيين المجموعة ---
+      if (widget.userType == 'p') {
+        var nuskDoc = await FirebaseFirestore.instance
+            .collection('Nusk')
+            .doc(widget.refNo)
+            .get();
+        infoData = nuskDoc.data() ?? {};
+
+        var groupsSnapshot = await FirebaseFirestore.instance
+            .collection('Groups')
+            .get();
+        for (var doc in groupsSnapshot.docs) {
+          var data = doc.data();
+          if ((data['current_count'] ?? 0) < (data['max_capacity'] ?? 0)) {
+            assignedGroupId = doc.id;
+            await doc.reference.update({
+              'current_count': FieldValue.increment(1),
+            });
+            break;
+          }
+        }
+      }
+      // --- 2. جلب بيانات الموظف وتجهيز المهام ---
+      else if (widget.userType == 's') {
+        var staffDoc = await FirebaseFirestore.instance
+            .collection('Staff')
+            .doc(widget.refNo)
+            .get();
+        infoData = staffDoc.data() ?? {};
+
+        Map<String, dynamic> activeHajjTasks = {};
+        var templates = staffDoc.data()?['task_templates'];
+        if (templates != null && templates is Map) {
+          templates.forEach((dayKey, taskList) {
+            if (taskList is List) {
+              activeHajjTasks[dayKey] = taskList
+                  .map(
+                    (title) => {
+                      'title': title.toString(),
+                      'is_completed': false,
+                    },
+                  )
+                  .toList();
+            }
+          });
+        }
+        infoData['active_hajj_tasks'] = activeHajjTasks;
+
+        var groupQuery = await FirebaseFirestore.instance
+            .collection('Groups')
+            .where('sup_id', isEqualTo: widget.refNo)
+            .limit(1)
+            .get();
+        if (groupQuery.docs.isNotEmpty) {
+          assignedGroupId = groupQuery.docs.first.id;
+        }
+      }
+
+      // --- 3. إنشاء حساب المستخدم في Firebase Auth ---
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: widget.email,
+            password: widget.password,
+          );
+
+      String uid = userCredential.user!.uid;
+
+      // --- 4. حفظ البيانات في Firestore (جدول Users) ---
+      await FirebaseFirestore.instance.collection('Users').doc(uid).set({
+        'uid': uid,
+        'email': widget.email,
+        'type': widget.userType,
+        'refNo': widget.refNo,
+        'info': infoData,
+        'group_id': assignedGroupId,
+        'fcm_token': fcmToken,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // --- 5. النجاح والتحويل للشاشة المناسبة ---
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم التحقق وإنشاء الحساب بنجاح! 🎉')),
+        );
+
+        if (widget.userType == 's') {
+          Navigator.pushReplacementNamed(context, '/staff_main');
+        } else {
+          Navigator.pushReplacementNamed(context, '/main');
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ في إنشاء الحساب: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('حدث خطأ غير متوقع: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -87,10 +210,9 @@ class _OtpScreenState extends State<OtpScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: const Color(0xFF1A1A1A), // لون خلفية مقارب للصورة
+      backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
         children: [
-          // الخلفية العلوية (ممكن تحطين صورة الباترن هنا إذا متوفرة عندك)
           Positioned(
             top: 0,
             left: 0,
@@ -99,11 +221,9 @@ class _OtpScreenState extends State<OtpScreen> {
             child: Image.asset(
               'assets/black.png',
               fit: BoxFit.cover,
-              opacity: const AlwaysStoppedAnimation(0.5), // تخفيف وضوح الخلفية
+              opacity: const AlwaysStoppedAnimation(0.5),
             ),
           ),
-
-          // عنوان الشاشة العلوي
           Positioned(
             top: topSectionHeight * 0.6,
             left: 0,
@@ -120,8 +240,6 @@ class _OtpScreenState extends State<OtpScreen> {
               ),
             ),
           ),
-
-          // الكارد السفلي اللي فيه الكعبة والبيانات
           Align(
             alignment: Alignment.bottomCenter,
             child: SizedBox(
@@ -134,11 +252,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
                 child: Stack(
                   children: [
-                    // صورة الكعبة
                     Positioned.fill(
                       child: Image.asset('assets/kaaba.png', fit: BoxFit.cover),
                     ),
-                    // التظليل الأسود فوق الكعبة عشان يبرز النص
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
@@ -153,7 +269,6 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                       ),
                     ),
-                    // المحتوى الداخلي
                     SafeArea(
                       top: false,
                       child: SingleChildScrollView(
@@ -175,8 +290,6 @@ class _OtpScreenState extends State<OtpScreen> {
                               ),
                             ),
                             const SizedBox(height: 25),
-
-                            // مربعات الـ OTP
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: List.generate(
@@ -184,15 +297,12 @@ class _OtpScreenState extends State<OtpScreen> {
                                 (index) => _otpBox(context, index),
                               ),
                             ),
-
                             const SizedBox(height: 35),
-
-                            // قسم العداد ومعلومات الإيميل
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildTimerBox(), // مربع العداد على اليسار
+                                _buildTimerBox(),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
@@ -218,18 +328,15 @@ class _OtpScreenState extends State<OtpScreen> {
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 15),
-
-                            // زر إعادة الإرسال
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 GestureDetector(
                                   onTap: _start == 0
                                       ? () {
-                                          // TODO: استدعاء دالة إرسال الإيميل
                                           _startTimer();
+                                          // اختياري: يمكنك هنا استدعاء API إرسال الرمز مرة أخرى
                                         }
                                       : null,
                                   child: Text(
@@ -255,11 +362,15 @@ class _OtpScreenState extends State<OtpScreen> {
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 40),
-
-                            // زر التحقق البني
-                            _buildSolidButton('تحقق', _verifyOtp),
+                            // 🌟 عرض مؤشر التحميل أو زر التحقق بناءً على الحالة
+                            isLoading
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF6B4E31),
+                                    ),
+                                  )
+                                : _buildSolidButton('تحقق', _verifyOtp),
                           ],
                         ),
                       ),
@@ -315,7 +426,6 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  // تصميم مربع العداد مثل الصورة
   Widget _buildTimerBox() {
     int min = _start ~/ 60;
     int sec = _start % 60;
@@ -339,14 +449,13 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  // تصميم الزر بلون بني مطابق للصورة
   Widget _buildSolidButton(String title, VoidCallback onPressed) {
     return SizedBox(
       width: double.infinity,
       height: 55,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF6B4E31), // لون الزر البني
+          backgroundColor: const Color(0xFF6B4E31),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

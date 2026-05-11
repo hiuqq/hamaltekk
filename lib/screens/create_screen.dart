@@ -3,9 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // 🌟 إضافة مكتبة حماية المفاتيح
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 🌟 حماية المفاتيح
 import 'package:hamaltekk/screens/login_screen.dart';
 import 'package:hamaltekk/screens/otp_screen.dart';
 
@@ -26,7 +24,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // 🌟 دالة إرسال الإيميل (بالأكواد المخفية)
   // ==========================================
   Future<void> sendOtpEmail(String userEmail, String otpCode) async {
-    // 🌟 جلب المفاتيح بأمان من ملف .env
     final serviceId = dotenv.env['EMAILJS_SERVICE_ID'] ?? '';
     final templateId = dotenv.env['EMAILJS_TEMPLATE_ID'] ?? '';
     final publicKey = dotenv.env['EMAILJS_PUBLIC_KEY'] ?? '';
@@ -70,9 +67,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
-      // ==========================================
-      // 🌟 التحقق من عدم تكرار الحساب بنفس رقم التصريح
-      // ==========================================
+      // 1. التحقق من عدم تكرار الحساب بنفس رقم التصريح
       var existingUserCheck = await FirebaseFirestore.instance
           .collection('Users')
           .where('refNo', isEqualTo: refNo)
@@ -81,115 +76,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (existingUserCheck.docs.isNotEmpty) {
         _showSnackBar('هذا التصريح أو الرقم الوظيفي مسجل مسبقاً في النظام!');
         setState(() => isLoading = false);
-        return; // إيقاف عملية التسجيل فوراً
+        return;
       }
 
-      String? fcmToken;
-      try {
-        fcmToken = await FirebaseMessaging.instance.getToken();
-      } catch (e) {
-        print("⚠️ تنبيه: فشل جلب التوكن (تأكد من إعدادات Firebase Messaging)");
-      }
-
+      // 2. التحقق من وجود الرقم في (نسك) أو (الموظفين)
       var nuskDoc = await FirebaseFirestore.instance
           .collection('Nusk')
           .doc(refNo)
           .get();
+      var staffDoc = await FirebaseFirestore.instance
+          .collection('Staff')
+          .doc(refNo)
+          .get();
 
-      String userType = '';
-      Map<String, dynamic> infoData = {};
-      Map<String, dynamic> activeHajjTasks = {};
-
-      if (nuskDoc.exists) {
-        userType = 'p';
-        infoData = nuskDoc.data()!;
-      } else {
-        var staffDoc = await FirebaseFirestore.instance
-            .collection('Staff')
-            .doc(refNo)
-            .get();
-
-        if (staffDoc.exists) {
-          userType = 's';
-          infoData = staffDoc.data()!;
-
-          var templates = staffDoc.data()?['task_templates'];
-          if (templates != null && templates is Map) {
-            templates.forEach((dayKey, taskList) {
-              if (taskList is List) {
-                activeHajjTasks[dayKey] = taskList
-                    .map(
-                      (title) => {
-                        'title': title.toString(),
-                        'is_completed': false,
-                      },
-                    )
-                    .toList();
-              }
-            });
-          }
-        } else {
-          _showSnackBar('رقم التصريح أو الرقم الوظيفي غير موجود');
-          setState(() => isLoading = false);
-          return;
-        }
+      if (!nuskDoc.exists && !staffDoc.exists) {
+        _showSnackBar('رقم التصريح أو الرقم الوظيفي غير موجود');
+        setState(() => isLoading = false);
+        return;
       }
 
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(email: email, password: password);
+      String userType = nuskDoc.exists ? 'p' : 's';
 
-      String uid = userCredential.user!.uid;
-      String? assignedGroupId;
-
-      if (userType == 'p') {
-        var groupsSnapshot = await FirebaseFirestore.instance
-            .collection('Groups')
-            .get();
-        for (var doc in groupsSnapshot.docs) {
-          var data = doc.data();
-          if ((data['current_count'] ?? 0) < (data['max_capacity'] ?? 0)) {
-            assignedGroupId = doc.id;
-            await doc.reference.update({
-              'current_count': FieldValue.increment(1),
-            });
-            break;
-          }
-        }
-      } else if (userType == 's') {
-        var groupQuery = await FirebaseFirestore.instance
-            .collection('Groups')
-            .where('sup_id', isEqualTo: refNo)
-            .limit(1)
-            .get();
-
-        if (groupQuery.docs.isNotEmpty) {
-          assignedGroupId = groupQuery.docs.first.id;
-          print("✅ تم ربط المشرف بالجروب: $assignedGroupId");
-        }
-      }
-
-      if (userType == 's') {
-        infoData['active_hajj_tasks'] = activeHajjTasks;
-      }
-
-      await FirebaseFirestore.instance.collection('Users').doc(uid).set({
-        'uid': uid,
-        'email': email,
-        'type': userType,
-        'refNo': refNo, // حفظ رقم التصريح لضمان عدم التكرار مستقبلاً
-        'info': infoData,
-        'group_id': assignedGroupId,
-        'fcm_token': fcmToken,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
+      // 3. توليد رمز OTP وإرساله للإيميل
       String generatedOtp = (Random().nextInt(9000) + 1000).toString();
-
       await sendOtpEmail(email, generatedOtp);
 
       if (mounted) {
         _showSnackBar('تم إرسال رمز التحقق إلى بريدك الإلكتروني 📩');
 
+        // 4. الانتقال لشاشة الـ OTP وتمرير كل البيانات المطلوبة لإنشاء الحساب لاحقاً
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -197,23 +112,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
               actualOtp: generatedOtp,
               userType: userType,
               email: email,
+              password: password, // 🌟 تمرير الباسورد
+              refNo: refNo, // 🌟 تمرير رقم التصريح
             ),
           ),
         );
-      }
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        _showSnackBar(
-          'البريد الإلكتروني مستخدم بالفعل! جاري تحويلك لتسجيل الدخول..',
-        );
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
-          );
-        }
-      } else {
-        _showSnackBar('خطأ في التسجيل: ${e.message}');
       }
     } catch (e) {
       _showSnackBar('حدث خطأ غير متوقع: $e');
