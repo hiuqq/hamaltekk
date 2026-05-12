@@ -1,6 +1,6 @@
 # 🕋 Hamlatek
 
-**IHSC | Integrated Hajj Campaign Systme**
+**IHSC | Integrated Hajj Campaign System**
 
 ---
 
